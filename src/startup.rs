@@ -1,12 +1,13 @@
 use std::net::TcpListener;
 
-use actix_web::{App, HttpServer, dev::Server, web};
+use actix_web::{App, HttpServer, dev::Server, middleware::from_fn, web};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
 use crate::{
     common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
+    middleware::auth::mw_authentication,
     modules::{health_check::health_check_handler, user},
 };
 
@@ -18,7 +19,10 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, a
             .wrap(TracingLogger::default())
             .app_data(app_state.clone())
             .route("/health_check", web::get().to(health_check_handler))
-            .service(web::scope("api").configure(user::config))
+            // public routes
+            .service(web::scope("/api").configure(user::config))
+            // protected routes
+            .service(web::scope("/api").wrap(from_fn(mw_authentication)))
     })
     .listen(listener)?
     .run();

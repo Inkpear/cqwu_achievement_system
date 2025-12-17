@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("登录失败，请检查用户名或密码是否正确")]
     LoginFailed,
     
+    #[error("您没有权限访问此接口")]
+    Unauthorized,
+
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -29,7 +32,7 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::LoginFailed => StatusCode::UNAUTHORIZED,
+            AppError::LoginFailed | AppError::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
 

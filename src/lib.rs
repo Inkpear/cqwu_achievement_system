@@ -5,3 +5,4 @@ pub mod modules;
 pub mod domain;
 pub mod common;
 pub mod utils;
+pub mod middleware;

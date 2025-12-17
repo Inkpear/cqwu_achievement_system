@@ -34,6 +34,14 @@ where
             data: Some(data),
         }
     }
+    
+    pub fn created(data: T, msg: impl Into<String>) -> Self {
+            Self {
+                code: StatusCode::CREATED,
+                message: msg.into(),
+                data: Some(data),
+            }
+        }
 }
 
 impl AppResponse<()> {
@@ -76,8 +84,8 @@ where
         self
     }
 
-    pub fn message(mut self, message: String) -> Self {
-        self.response.message = message;
+    pub fn message(mut self, message: &str) -> Self {
+        self.response.message = message.into();
         self
     }
 

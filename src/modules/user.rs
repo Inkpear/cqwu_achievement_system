@@ -1,0 +1,10 @@
+use actix_web::web;
+
+mod model;
+mod routes;
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/users").route("/register", web::post().to(routes::register_user_handler)),
+    );
+}

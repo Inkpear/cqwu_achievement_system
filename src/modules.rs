@@ -1,2 +1,2 @@
-pub mod routes;
-pub use routes::*;
+pub mod health_check;
+pub mod user;

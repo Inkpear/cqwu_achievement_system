@@ -6,7 +6,7 @@ use tracing_actix_web::TracingLogger;
 
 use crate::{
     configuration::{DatabaseSettings, Settings},
-    modules::routes::health_check_handler
+    modules::{health_check::health_check_handler, user},
 };
 
 pub async fn run(listener: TcpListener, pool: PgPool) -> Result<Server, anyhow::Error> {
@@ -16,7 +16,8 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<Server, anyhow::
         App::new()
             .wrap(TracingLogger::default())
             .app_data(pool.clone())
-            .service(health_check_handler)
+            .route("/health_check", web::get().to(health_check_handler))
+            .service(web::scope("api").configure(user::config))
     })
     .listen(listener)?
     .run();

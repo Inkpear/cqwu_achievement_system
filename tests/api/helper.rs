@@ -71,6 +71,15 @@ impl TestApp {
             api_client,
         }
     }
+
+    pub async fn post_register(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/users/register", self.address))
+            .json(body)
+            .send()
+            .await
+            .unwrap()
+    }
 }
 
 pub struct TestUser {
@@ -139,4 +148,9 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .expect("Failed to migrate database");
 
     connection_pool
+}
+
+pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, msg: &str) {
+    assert_eq!(response["code"].as_u64().unwrap(), code);
+    assert_eq!(response["message"].as_str().unwrap(), msg);
 }

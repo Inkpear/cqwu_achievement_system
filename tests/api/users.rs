@@ -57,9 +57,44 @@ async fn register_user_success() {
 }
 
 #[tokio::test]
+async fn register_user_is_rejected_when_username_already_exists() {
+    let app = TestApp::spawn().await;
+
+    let body = serde_json::json!({
+        "username": "duplicate_user",
+        "nickname": "Test User",
+        "password": "password123"
+    });
+
+    let response = app
+        .post_register(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to register user");
+
+    check_response_code_and_message(&response, 201, "注册成功");
+
+    let duplicate_body = serde_json::json!({
+        "username": "duplicate_user",
+        "nickname": "Another User",
+        "password": "different_password"
+    });
+
+    let response = app
+        .post_register(&duplicate_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 409, "用户已经存在，请勿重复注册");
+}
+
+#[tokio::test]
 async fn register_user_is_rejected_when_body_is_invalid() {
     let app = TestApp::spawn().await;
-    
+
     let missing_field_cases = vec![
         serde_json::json!({}),
         serde_json::json!({"username": "test"}),
@@ -67,25 +102,142 @@ async fn register_user_is_rejected_when_body_is_invalid() {
     ];
 
     for body in missing_field_cases {
-        let response = app
-            .post_register(&body)
-            .await;
-        
+        let response = app.post_register(&body).await;
+
         assert_eq!(response.status().as_u16(), 400);
     }
 
     let validation_cases = vec![
-        (serde_json::json!({"username": "", "nickname": "nick", "password": "pass"}), "用户名必须在3-50个字符之间"),
-        (serde_json::json!({"username": "ab", "nickname": "nick", "password": "password"}), "用户名必须在3-50个字符之间"),
-        (serde_json::json!({"username": "test", "nickname": "", "password": "password"}), "昵称必须在3-50个字符之间"),
-        (serde_json::json!({"username": "test", "nickname": "ni", "password": "password"}), "昵称必须在3-50个字符之间"),
-        (serde_json::json!({"username": "test", "nickname": "nick", "password": ""}), "密码必须在6-100个字符之间"),
-        (serde_json::json!({"username": "test", "nickname": "nick", "password": "12345"}), "密码必须在6-100个字符之间"),
+        (
+            serde_json::json!({"username": "", "nickname": "nick", "password": "pass"}),
+            "用户名必须在3-50个字符之间",
+        ),
+        (
+            serde_json::json!({"username": "ab", "nickname": "nick", "password": "password"}),
+            "用户名必须在3-50个字符之间",
+        ),
+        (
+            serde_json::json!({"username": "test", "nickname": "", "password": "password"}),
+            "昵称必须在3-50个字符之间",
+        ),
+        (
+            serde_json::json!({"username": "test", "nickname": "ni", "password": "password"}),
+            "昵称必须在3-50个字符之间",
+        ),
+        (
+            serde_json::json!({"username": "test", "nickname": "nick", "password": ""}),
+            "密码必须在6-100个字符之间",
+        ),
+        (
+            serde_json::json!({"username": "test", "nickname": "nick", "password": "12345"}),
+            "密码必须在6-100个字符之间",
+        ),
     ];
 
     for (body, expected_message) in validation_cases {
         let response = app
             .post_register(&body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+
+        check_response_code_and_message(&response, 400, expected_message);
+    }
+}
+
+#[tokio::test]
+async fn login_success_and_recieved_a_valid_jwt() {
+    let app = TestApp::spawn().await;
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+
+    let body = serde_json::json!({
+        "username": user.username,
+        "password": user.password
+    });
+
+    let response = app
+        .post_login(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "登录成功");
+
+    assert!(response.get("data").is_some());
+
+    let jwt = response.get("data").unwrap().as_str().unwrap();
+
+    assert!(app.jwt_config.verify_jwt_token(jwt).is_ok())
+}
+
+#[tokio::test]
+async fn login_is_rejected_with_invalid_credentials() {
+    let app = TestApp::spawn().await;
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+
+    let body = serde_json::json!({
+        "username": user.username,
+        "password": "wrong_password"
+    });
+
+    let response = app
+        .post_login(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 401, "登录失败，请检查用户名或密码是否正确");
+
+    let body = serde_json::json!({
+        "username": "wrong_username",
+        "password": "wrong_password"
+    });
+
+    let response = app
+        .post_login(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 401, "登录失败，请检查用户名或密码是否正确");
+}
+
+#[tokio::test]
+async fn login_is_rejected_with_missing_credentials() {
+    let app = TestApp::spawn().await;
+
+    let test_cases = vec![
+        serde_json::json!({}),
+        serde_json::json!({"username": ""}),
+        serde_json::json!({"password": ""}),
+    ];
+
+    for body in test_cases {
+        let response = app.post_login(&body).await;
+
+        assert_eq!(response.status().as_u16(), 400);
+    }
+
+    let test_cases = vec![
+        (
+            serde_json::json!({"username": "123", "password": ""}),
+            "密码不能为空".into(),
+        ),
+        (
+            serde_json::json!({"password": "123", "username": ""}),
+            "用户名不能为空".into(),
+        ),
+    ];
+
+    for (body, expected_message) in test_cases {
+        let response = app
+            .post_login(&body)
             .await
             .json::<serde_json::Value>()
             .await

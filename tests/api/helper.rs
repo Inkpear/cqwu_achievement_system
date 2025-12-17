@@ -7,6 +7,7 @@ use argon2::{
 use cqwu_achievement_system::{
     configuration::{DatabaseSettings, get_configuration},
     telemetry::{get_subscriber, init_subscriber},
+    utils::jwt::JwtConfig,
 };
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -32,6 +33,7 @@ pub struct TestApp {
     pub port: u16,
     pub db_pool: PgPool,
     pub api_client: reqwest::Client,
+    pub jwt_config: JwtConfig,
 }
 
 impl TestApp {
@@ -53,6 +55,8 @@ impl TestApp {
             cqwu_achievement_system::startup::Application::build(configuration.clone())
                 .await
                 .expect("Failed to build application.");
+        
+        let jwt_config = configuration.jwt;
 
         let address = format!(
             "http://{}:{}",
@@ -69,6 +73,7 @@ impl TestApp {
             port,
             db_pool,
             api_client,
+            jwt_config,
         }
     }
 
@@ -78,7 +83,16 @@ impl TestApp {
             .json(body)
             .send()
             .await
-            .unwrap()
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_login<Body: serde::Serialize>(&self, form: &Body) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/users/login", self.address))
+            .form(form)
+            .send()
+            .await
+            .expect("Failed to execute request")
     }
 }
 

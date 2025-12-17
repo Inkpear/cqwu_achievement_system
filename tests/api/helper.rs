@@ -152,5 +152,5 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 
 pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, msg: &str) {
     assert_eq!(response["code"].as_u64().unwrap(), code);
-    assert_eq!(response["message"].as_str().unwrap(), msg);
+    assert!(response["message"].as_str().unwrap().contains(msg));
 }

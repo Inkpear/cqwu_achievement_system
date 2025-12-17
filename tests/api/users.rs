@@ -55,3 +55,42 @@ async fn register_user_success() {
         body["nickname"].as_str()
     );
 }
+
+#[tokio::test]
+async fn register_user_is_rejected_when_body_is_invalid() {
+    let app = TestApp::spawn().await;
+    
+    let missing_field_cases = vec![
+        serde_json::json!({}),
+        serde_json::json!({"username": "test"}),
+        serde_json::json!({"username": "test", "password": "test"}),
+    ];
+
+    for body in missing_field_cases {
+        let response = app
+            .post_register(&body)
+            .await;
+        
+        assert_eq!(response.status().as_u16(), 400);
+    }
+
+    let validation_cases = vec![
+        (serde_json::json!({"username": "", "nickname": "nick", "password": "pass"}), "用户名必须在3-50个字符之间"),
+        (serde_json::json!({"username": "ab", "nickname": "nick", "password": "password"}), "用户名必须在3-50个字符之间"),
+        (serde_json::json!({"username": "test", "nickname": "", "password": "password"}), "昵称必须在3-50个字符之间"),
+        (serde_json::json!({"username": "test", "nickname": "ni", "password": "password"}), "昵称必须在3-50个字符之间"),
+        (serde_json::json!({"username": "test", "nickname": "nick", "password": ""}), "密码必须在6-100个字符之间"),
+        (serde_json::json!({"username": "test", "nickname": "nick", "password": "12345"}), "密码必须在6-100个字符之间"),
+    ];
+
+    for (body, expected_message) in validation_cases {
+        let response = app
+            .post_register(&body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+
+        check_response_code_and_message(&response, 400, expected_message);
+    }
+}

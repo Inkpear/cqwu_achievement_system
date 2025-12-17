@@ -1,0 +1,12 @@
+database:
+  port: 5432
+  username: "postgres"
+  password: "password"
+  database_name: "cqwu_achievement_database"
+
+application:
+  port: 8000
+
+log:
+  log_path: "logs"
+  log_prefix: "achievement-api"

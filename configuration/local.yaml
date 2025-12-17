@@ -1,0 +1,10 @@
+database:
+  host: "192.168.31.199"
+  require_ssl: false
+
+application:
+  host: "127.0.0.1"
+  base_url: "http://127.0.0.1"
+
+log:
+  log_level: "trace"

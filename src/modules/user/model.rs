@@ -1,36 +1,39 @@
 use secrecy::SecretString;
 use serde::Deserialize;
 use serde::Serialize;
+#[cfg(feature = "swagger")]
+use utoipa::ToSchema;
 use validator::{Validate, ValidationErrors};
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct UserResponse {
+    #[cfg_attr(
+        feature = "swagger",
+        schema(example = "550e8400-e29b-41d4-a716-446655440000")
+    )]
     pub user_id: uuid::Uuid,
+
+    #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
     pub username: String,
+
+    #[cfg_attr(feature = "swagger", schema(example = "Inkpear"))]
     pub nickname: String,
 }
 
 #[derive(Deserialize, Validate)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct RegisterUserRequest {
-    #[validate(length(
-        min = 3,
-        max = 50,
-        message = "用户名必须在3-50个字符之间"
-    ))]
+    #[validate(length(min = 3, max = 50, message = "用户名必须在3-50个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
     pub username: String,
 
-    #[validate(length(
-        min = 3,
-        max = 50,
-        message = "昵称必须在3-50个字符之间"
-    ))]
+    #[validate(length(min = 3, max = 50, message = "昵称必须在3-50个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "Inkpear"))]
     pub nickname: String,
 
-    #[validate(length(
-        min = 6,
-        max = 100,
-        message = "密码必须在6-100个字符之间"
-    ))]
+    #[validate(length(min = 6, max = 100, message = "密码必须在6-100个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "password"))]
     pub password: String,
 }
 
@@ -52,10 +55,14 @@ impl RegisterUser {
 }
 
 #[derive(Deserialize, Validate)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct LoginRequest {
     #[validate(length(min = 1, message = "用户名不能为空"))]
+    #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
     pub username: String,
+
     #[validate(length(min = 1, message = "密码不能为空"))]
+    #[cfg_attr(feature = "swagger", schema(example = "password"))]
     pub password: String,
 }
 
@@ -72,4 +79,16 @@ impl LoginForm {
             password: SecretString::from(req.password),
         })
     }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+pub struct LoginResponse {
+    #[cfg_attr(
+        feature = "swagger",
+        schema(
+            example = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJleHAiOjE3MzUzOTIwMDAsImlhdCI6MTczNTMwNTYwMCwidXNlcm5hbWUiOiJ0ZXN0dXNlciJ9.example_signature"
+        )
+    )]
+    pub token: String,
 }

@@ -168,9 +168,16 @@ async fn login_success_and_recieved_a_valid_jwt() {
 
     assert!(response.get("data").is_some());
 
-    let jwt = response.get("data").unwrap().as_str().unwrap();
+    let data = response.get("data").unwrap();
+    let jwt = data.get("token").unwrap().as_str().unwrap();
 
-    assert!(app.jwt_config.verify_jwt_token(jwt).is_ok())
+    let claims = app
+        .jwt_config
+        .verify_jwt_token(jwt)
+        .expect("JWT verification failed");
+
+    assert_eq!(claims.sub, user.user_id.unwrap());
+    assert_eq!(claims.username, user.username);
 }
 
 #[tokio::test]

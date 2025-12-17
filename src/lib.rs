@@ -1,8 +1,10 @@
-pub mod startup;
-pub mod configuration;
-pub mod telemetry;
-pub mod modules;
-pub mod domain;
 pub mod common;
-pub mod utils;
+pub mod configuration;
+#[cfg(feature = "swagger")]
+pub mod documention;
+pub mod domain;
 pub mod middleware;
+pub mod modules;
+pub mod startup;
+pub mod telemetry;
+pub mod utils;

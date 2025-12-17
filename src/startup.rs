@@ -4,6 +4,11 @@ use actix_web::{App, HttpServer, dev::Server, middleware::from_fn, web};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
+#[cfg(feature = "swagger")]
+use utoipa::OpenApi;
+#[cfg(feature = "swagger")]
+use utoipa_swagger_ui::SwaggerUi;
+
 use crate::{
     common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
@@ -11,18 +16,41 @@ use crate::{
     modules::{health_check::health_check_handler, user},
 };
 
+#[cfg(feature = "swagger")]
+static SWAGGER_INFO: std::sync::LazyLock<()> = std::sync::LazyLock::new(|| {
+    tracing::info!("Swagger UI will be available at /swagger-ui/");
+});
+
+#[cfg(feature = "swagger")]
+use crate::documention::ApiDoc;
+
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, anyhow::Error> {
     let app_state = web::Data::new(app_state);
 
+    #[cfg(feature = "swagger")]
+    let openapi = ApiDoc::openapi();
+
     let server = HttpServer::new(move || {
-        App::new()
+        let mut app = App::new()
             .wrap(TracingLogger::default())
-            .app_data(app_state.clone())
+            .app_data(app_state.clone());
+
+        #[cfg(feature = "swagger")]
+        {
+            app = app.service(
+                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
+            );
+            std::sync::LazyLock::force(&SWAGGER_INFO);
+        }
+
+        app = app
             .route("/health_check", web::get().to(health_check_handler))
             // public routes
             .service(web::scope("/api").configure(user::config))
             // protected routes
-            .service(web::scope("/api").wrap(from_fn(mw_authentication)))
+            .service(web::scope("/api").wrap(from_fn(mw_authentication)));
+
+        app
     })
     .listen(listener)?
     .run();

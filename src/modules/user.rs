@@ -1,7 +1,7 @@
 use actix_web::web;
 
-mod model;
-mod routes;
+pub(crate) mod model;
+pub(crate) mod routes;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(

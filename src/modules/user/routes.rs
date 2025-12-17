@@ -11,7 +11,7 @@ use crate::{
         response::AppResponse,
     },
     modules::user::model::{
-        LoginForm, LoginRequest, RegisterUser, RegisterUserRequest, UserResponse,
+        LoginForm, LoginRequest, LoginResponse, RegisterUser, RegisterUserRequest, UserResponse,
     },
     utils::{
         jwt::JwtConfig,
@@ -19,6 +19,20 @@ use crate::{
     },
 };
 
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        post,
+        path = "/api/users/register",
+        tag = "用户管理",
+        request_body = RegisterUserRequest,
+        responses(
+            (status = 201, description = "注册成功", body = AppResponse<UserResponse>),
+            (status = 400, description = "参数校验失败"),
+            (status = 409, description = "用户已存在")
+        )
+    )
+)]
 #[tracing::instrument(
     name = "注册新用户",
     skip(app_state, req),
@@ -52,6 +66,22 @@ pub async fn register_user_handler(
     Ok(AppResponse::created(response, "注册成功"))
 }
 
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        post,
+        path = "/api/users/login",
+        tag = "用户管理",
+        request_body(
+            content = LoginRequest,
+            content_type = "application/x-www-form-urlencoded"
+        ),
+        responses(
+            (status = 200, description = "登录成功", body = AppResponse<LoginResponse>),
+            (status = 401, description = "登录失败，请检查用户名或密码是否正确")
+        )
+    )
+)]
 #[tracing::instrument(name = "登录用户", skip(req, app_state), fields(user_id = tracing::field::Empty))]
 pub async fn login_user_handler(
     app_state: web::Data<AppState>,
@@ -67,7 +97,9 @@ pub async fn login_user_handler(
 
     let jwt = generate_jwt(&app_state.jwt_config, user_id, &login_form.username).await?;
 
-    Ok(AppResponse::success_msg(jwt, "登录成功"))
+    let response = LoginResponse { token: jwt };
+
+    Ok(AppResponse::success_msg(response, "登录成功"))
 }
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
@@ -139,7 +171,8 @@ pub async fn validate_user_login(
         expected_password_hash = saved_passwrod_hash;
     }
 
-    verify_password(password, expected_password_hash).await
+    verify_password(password, expected_password_hash)
+        .await
         .map_err(|_| AppError::LoginFailed)?;
 
     user_id.ok_or(AppError::LoginFailed)

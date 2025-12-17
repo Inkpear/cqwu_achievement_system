@@ -30,6 +30,7 @@ pub async fn hash_password(password: SecretString) -> Result<SecretString, anyho
     spawn_blocking_with_tracing(move || compute_password_hash(password)).await?
 }
 
+#[tracing::instrument(name = "验证密码", skip(password, hash))]
 pub async fn verify_password(
     password: SecretString,
     hash: SecretString,

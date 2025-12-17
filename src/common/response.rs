@@ -27,10 +27,10 @@ where
         }
     }
 
-    pub fn success_msg(data: T, message: String) -> Self {
+    pub fn success_msg(data: T, message: impl Into<String>) -> Self {
         Self {
             code: StatusCode::OK,
-            message,
+            message: message.into(),
             data: Some(data),
         }
     }

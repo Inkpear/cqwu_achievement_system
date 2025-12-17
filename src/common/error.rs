@@ -7,9 +7,12 @@ pub enum AppError {
     #[error("参数校验失败: {0}")]
     ValidationError(String),
 
-    #[error("用户已经存在， 请勿重复注册")]
+    #[error("用户已经存在，请勿重复注册")]
     UserAlreadyExists,
 
+    #[error("登录失败，请检查用户名或密码是否正确")]
+    LoginFailed,
+    
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -26,6 +29,7 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::LoginFailed => StatusCode::UNAUTHORIZED,
         }
     }
 

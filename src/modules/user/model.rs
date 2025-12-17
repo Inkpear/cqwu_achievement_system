@@ -50,3 +50,26 @@ impl RegisterUser {
         })
     }
 }
+
+#[derive(Deserialize, Validate)]
+pub struct LoginRequest {
+    #[validate(length(min = 1, message = "用户名不能为空"))]
+    pub username: String,
+    #[validate(length(min = 1, message = "密码不能为空"))]
+    pub password: String,
+}
+
+pub struct LoginForm {
+    pub username: String,
+    pub password: SecretString,
+}
+
+impl LoginForm {
+    pub fn try_from_request(req: LoginRequest) -> Result<Self, ValidationErrors> {
+        req.validate()?;
+        Ok(LoginForm {
+            username: req.username,
+            password: SecretString::from(req.password),
+        })
+    }
+}

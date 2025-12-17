@@ -5,17 +5,18 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
 use crate::{
+    common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
     modules::{health_check::health_check_handler, user},
 };
 
-pub async fn run(listener: TcpListener, pool: PgPool) -> Result<Server, anyhow::Error> {
-    let pool = web::Data::new(pool);
+pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, anyhow::Error> {
+    let app_state = web::Data::new(app_state);
 
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .app_data(pool.clone())
+            .app_data(app_state.clone())
             .route("/health_check", web::get().to(health_check_handler))
             .service(web::scope("api").configure(user::config))
     })
@@ -44,9 +45,13 @@ impl Application {
             configuration.application.host, configuration.application.port
         );
 
+        let jwt_config = configuration.jwt;
+
+        let app_state = AppState::new(connection_pool, jwt_config);
+
         let listener = std::net::TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool).await?;
+        let server = run(listener, app_state).await?;
 
         Ok(Self { port, server })
     }

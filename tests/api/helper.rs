@@ -6,6 +6,7 @@ use argon2::{
 };
 use cqwu_achievement_system::{
     configuration::{DatabaseSettings, get_configuration},
+    middleware::auth::UserRole,
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
 };
@@ -139,6 +140,7 @@ pub struct TestUser {
     pub username: String,
     pub nickname: String,
     pub password: String,
+    pub role: UserRole,
 }
 
 impl TestUser {
@@ -148,6 +150,17 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
+            role: UserRole::User,
+        }
+    }
+
+    pub fn new_admin() -> Self {
+        Self {
+            user_id: None,
+            username: Uuid::new_v4().to_string(),
+            nickname: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+            role: UserRole::Admin,
         }
     }
 

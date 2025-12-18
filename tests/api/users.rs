@@ -259,7 +259,7 @@ async fn change_passwrod_is_rejected_when_old_password_is_wrong() {
     let mut app = TestApp::spawn().await;
     let mut user = TestUser::new();
     user.store(&app.db_pool).await;
-    
+
     app.login(&user).await;
 
     let body = serde_json::json!({
@@ -282,7 +282,7 @@ async fn change_passwrod_success() {
     let mut app = TestApp::spawn().await;
     let mut user = TestUser::new();
     user.store(&app.db_pool).await;
-    
+
     app.login(&user).await;
 
     let body = serde_json::json!({
@@ -331,4 +331,39 @@ async fn try_to_change_password_failed_when_not_logged_in() {
         .expect("Failed to parse JSON response");
 
     check_response_code_and_message(&response, 401, "未授权访问，请先登录");
+}
+
+#[tokio::test]
+async fn when_user_is_disabled_request_is_rejected() {
+    let mut app = TestApp::spawn().await;
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+
+    sqlx::query!(
+        r#"
+        UPDATE sys_user
+        SET is_active = FALSE
+        WHERE user_id = $1
+        "#,
+        user.user_id
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to disable user");
+
+    app.login(&user).await;
+
+    let body = serde_json::json!({
+        "raw_password": user.password,
+        "new_password": "new_secure_password"
+    });
+
+    let response = app
+        .post_change_password(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 401, "用户已被禁用，请联系管理员");
 }

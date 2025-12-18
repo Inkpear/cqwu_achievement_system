@@ -22,6 +22,12 @@ pub enum AppError {
     #[error("密码错误，请检查您的输入是否正确")]
     PasswordWrong,
 
+    #[error("用户已被禁用，请联系管理员")]
+    UserDisabled,
+
+    #[error("用户权限不足")]
+    UserRoleNotEnough,
+
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -38,8 +44,12 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::LoginFailed | AppError::PasswordWrong => StatusCode::FORBIDDEN,
-            AppError::Unauthorized | AppError::JwtEexpired => StatusCode::UNAUTHORIZED,
+            AppError::LoginFailed | AppError::PasswordWrong | AppError::UserRoleNotEnough => {
+                StatusCode::FORBIDDEN
+            }
+            AppError::Unauthorized | AppError::JwtEexpired | AppError::UserDisabled => {
+                StatusCode::UNAUTHORIZED
+            }
         }
     }
 

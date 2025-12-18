@@ -11,6 +11,7 @@ use actix_web::{
     web,
 };
 use jsonwebtoken::errors::ErrorKind;
+use sqlx::PgPool;
 
 use crate::{
     common::{app_state::AppState, error::AppError},
@@ -20,10 +21,21 @@ use crate::{
 #[derive(Clone)]
 pub struct AuthenticatedUser(Claims);
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub enum UserRole {
-    ADMIN,
-    USER,
+    #[serde(rename = "ADMIN")]
+    Admin,
+    #[serde(rename = "USER")]
+    User,
+}
+
+impl From<String> for UserRole {
+    fn from(s: String) -> Self {
+        match s.to_ascii_uppercase().as_str() {
+            "ADMIN" => UserRole::Admin,
+            _ => UserRole::User,
+        }
+    }
 }
 
 impl FromRequest for AuthenticatedUser {
@@ -50,7 +62,7 @@ impl Deref for AuthenticatedUser {
     }
 }
 
-#[tracing::instrument(name = "Verify Jwt token", skip(req, next))]
+#[tracing::instrument(name = "校验认证令牌", skip(req, next))]
 pub async fn mw_authentication(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
@@ -71,7 +83,10 @@ pub async fn mw_authentication(
 
         match token {
             Some(t) => match jwt_config.verify_jwt_token(t) {
-                Ok(claims) => Ok(AuthenticatedUser(claims)),
+                Ok(claims) => {
+                    check_user_enabled(&app_state.pool, &claims).await?;
+                    Ok(AuthenticatedUser(claims))
+                }
                 Err(e) => match e.kind() {
                     ErrorKind::ExpiredSignature => Err(AppError::JwtEexpired),
                     _ => Err(AppError::Unauthorized),
@@ -88,4 +103,25 @@ pub async fn mw_authentication(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+#[tracing::instrument(name = "检查用户是否被禁用", skip(pool, claims))]
+pub async fn check_user_enabled(pool: &PgPool, claims: &Claims) -> Result<(), AppError> {
+    let row = sqlx::query!(
+        r#"
+        SELECT is_active
+        FROM sys_user
+        WHERE user_id = $1
+        "#,
+        claims.sub
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if !row.is_active {
+        return Err(AppError::UserDisabled);
+    }
+
+    Ok(())
 }

@@ -4,12 +4,15 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::middleware::auth::UserRole;
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: Uuid,
     pub exp: usize,
     pub iat: usize,
     pub username: String,
+    pub role: UserRole,
 }
 
 #[derive(Deserialize, Clone)]
@@ -23,6 +26,7 @@ impl JwtConfig {
         &self,
         user_id: Uuid,
         username: &str,
+        role: UserRole,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let issued_at = Utc::now();
         let expired_at = issued_at + Duration::seconds(self.expiration as i64);
@@ -32,6 +36,7 @@ impl JwtConfig {
             exp: expired_at.timestamp() as usize,
             iat: issued_at.timestamp() as usize,
             username: username.to_string(),
+            role,
         };
 
         let token = jsonwebtoken::encode(

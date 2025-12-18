@@ -9,6 +9,7 @@ use cqwu_achievement_system::{
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
 };
+use reqwest::header::HeaderMap;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
@@ -47,7 +48,7 @@ impl TestApp {
             c
         };
 
-        let api_client = reqwest::Client::builder().build().unwrap();
+        let api_client = reqwest::Client::new();
 
         let db_pool = configure_database(&configuration.database).await;
 
@@ -55,7 +56,7 @@ impl TestApp {
             cqwu_achievement_system::startup::Application::build(configuration.clone())
                 .await
                 .expect("Failed to build application.");
-        
+
         let jwt_config = configuration.jwt;
 
         let address = format!(
@@ -79,7 +80,7 @@ impl TestApp {
 
     pub async fn post_register(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/users/register", self.address))
+            .post(&format!("{}/api/auth/register", self.address))
             .json(body)
             .send()
             .await
@@ -88,8 +89,45 @@ impl TestApp {
 
     pub async fn post_login<Body: serde::Serialize>(&self, form: &Body) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/users/login", self.address))
+            .post(&format!("{}/api/auth/login", self.address))
             .form(form)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn login(&mut self, user: &TestUser) {
+        let body = serde_json::json!({
+            "username": user.username,
+            "password": user.password,
+        });
+
+        let jwt = self
+            .post_login(&body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse login response")["data"]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Authorization", format!("Bearer {}", jwt).parse().unwrap());
+
+        self.api_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .expect("Failed to build client with headers");
+    }
+
+    pub async fn post_change_password<Body: serde::Serialize>(
+        &self,
+        body: &Body,
+    ) -> reqwest::Response {
+        self.api_client
+            .put(&format!("{}/api/auth/password", self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request")
@@ -165,6 +203,15 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 }
 
 pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, msg: &str) {
-    assert_eq!(response["code"].as_u64().unwrap(), code);
-    assert!(response["message"].as_str().unwrap().contains(msg));
+    assert_eq!(
+        response["code"].as_u64().unwrap(),
+        code,
+        "code is not match\nresponse = {:#?}",
+        response
+    );
+    assert!(
+        response["message"].as_str().unwrap().contains(msg),
+        "message is not match\nresponse = {:#?}",
+        response
+    );
 }

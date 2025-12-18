@@ -16,6 +16,10 @@ pub struct AppResponse<T> {
     data: Option<T>,
 }
 
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+#[derive(serde::Serialize)]
+pub struct EmptyData;
+
 pub struct AppResponseBuilder<T> {
     response: AppResponse<T>,
 }

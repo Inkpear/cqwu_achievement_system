@@ -12,9 +12,15 @@ pub enum AppError {
 
     #[error("登录失败，请检查用户名或密码是否正确")]
     LoginFailed,
-    
-    #[error("您没有权限访问此接口")]
+
+    #[error("令牌已过期，请重新登录")]
+    JwtEexpired,
+
+    #[error("未授权访问，请先登录")]
     Unauthorized,
+
+    #[error("密码错误，请检查您的输入是否正确")]
+    PasswordWrong,
 
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
@@ -32,29 +38,23 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::LoginFailed | AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::LoginFailed | AppError::PasswordWrong => StatusCode::FORBIDDEN,
+            AppError::Unauthorized | AppError::JwtEexpired => StatusCode::UNAUTHORIZED,
         }
     }
 
     fn error_response(&self) -> actix_web::HttpResponse<actix_web::body::BoxBody> {
-        let status = match self.status_code() {
-            StatusCode::INTERNAL_SERVER_ERROR => {
-                tracing::error!("Unexpected error: {}", self);
-                let response = AppResponse::empty()
-                    .code(StatusCode::INTERNAL_SERVER_ERROR)
-                    .message("系统内部错误，请稍后再试") 
-                    .build();
-                return HttpResponse::InternalServerError().json(response);
-            }
-            _ => self.status_code(),
+        let status_code = self.status_code();
+        let message = match status_code {
+            StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),
+            _ => self.to_string(),
         };
-        let message = self.to_string();
         let response = AppResponse::empty()
-            .code(status.clone())
+            .code(status_code.clone())
             .message(&message)
             .build();
 
-        HttpResponse::build(status).json(response)
+        HttpResponse::build(status_code).json(response)
     }
 }
 

@@ -10,6 +10,7 @@ use actix_web::{
     middleware::Next,
     web,
 };
+use jsonwebtoken::errors::ErrorKind;
 
 use crate::{
     common::{app_state::AppState, error::AppError},
@@ -18,6 +19,12 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AuthenticatedUser(Claims);
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum UserRole {
+    ADMIN,
+    USER,
+}
 
 impl FromRequest for AuthenticatedUser {
     type Error = AppError;
@@ -65,7 +72,10 @@ pub async fn mw_authentication(
         match token {
             Some(t) => match jwt_config.verify_jwt_token(t) {
                 Ok(claims) => Ok(AuthenticatedUser(claims)),
-                Err(_) => Err(AppError::Unauthorized),
+                Err(e) => match e.kind() {
+                    ErrorKind::ExpiredSignature => Err(AppError::JwtEexpired),
+                    _ => Err(AppError::Unauthorized),
+                },
             },
             None => Err(AppError::Unauthorized),
         }

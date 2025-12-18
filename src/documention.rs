@@ -1,5 +1,5 @@
-use crate::common::response::AppResponse;
-use crate::modules::user::model::*;
+use crate::common::response::{AppResponse, EmptyData};
+use crate::modules::auth::model::*;
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -8,8 +8,9 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        crate::modules::user::routes::register_user_handler,
-        crate::modules::user::routes::login_user_handler,
+        crate::modules::auth::routes::register_user_handler,
+        crate::modules::auth::routes::login_user_handler,
+        crate::modules::auth::routes::change_password_handler
     ),
     components(
         schemas(
@@ -17,8 +18,11 @@ use utoipa::{
             UserResponse,
             LoginRequest,
             LoginResponse,
+            ChangePasswordRequest,
             AppResponse<UserResponse>,
-            AppResponse<LoginResponse>
+            AppResponse<LoginResponse>,
+            AppResponse<EmptyData>,
+            EmptyData
         )
     ),
     modifiers(&SecurityAddon),

@@ -10,8 +10,10 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         response::AppResponse,
     },
-    modules::user::model::{
-        LoginForm, LoginRequest, LoginResponse, RegisterUser, RegisterUserRequest, UserResponse,
+    middleware::auth::AuthenticatedUser,
+    modules::auth::model::{
+        ChangePasswordRequest, ChangePasswrod, LoginForm, LoginRequest, LoginResponse,
+        RegisterUser, RegisterUserRequest, UserResponse,
     },
     utils::{
         jwt::JwtConfig,
@@ -19,11 +21,14 @@ use crate::{
     },
 };
 
+#[cfg(feature = "swagger")]
+use crate::common::response::EmptyData;
+
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
         post,
-        path = "/api/users/register",
+        path = "/api/auth/register",
         tag = "用户管理",
         request_body = RegisterUserRequest,
         responses(
@@ -70,7 +75,7 @@ pub async fn register_user_handler(
     feature = "swagger",
     utoipa::path(
         post,
-        path = "/api/users/login",
+        path = "/api/auth/login",
         tag = "用户管理",
         request_body(
             content = LoginRequest,
@@ -78,7 +83,8 @@ pub async fn register_user_handler(
         ),
         responses(
             (status = 200, description = "登录成功", body = AppResponse<LoginResponse>),
-            (status = 401, description = "登录失败，请检查用户名或密码是否正确")
+            (status = 400, description = "参数校验失败"),
+            (status = 403, description = "登录失败，请检查用户名或密码是否正确")
         )
     )
 )]
@@ -91,7 +97,9 @@ pub async fn login_user_handler(
         LoginForm::try_from_request(req.0).map_err(|e| AppError::ValidationError(e.to_string()))?;
 
     let user_id =
-        validate_user_login(&login_form.username, login_form.password, &app_state.pool).await?;
+        validate_user_password(&login_form.username, login_form.password, &app_state.pool)
+            .await
+            .map_err(|_| AppError::LoginFailed)?;
 
     tracing::Span::current().record("user_id", &tracing::field::display(user_id));
 
@@ -100,6 +108,57 @@ pub async fn login_user_handler(
     let response = LoginResponse { token: jwt };
 
     Ok(AppResponse::success_msg(response, "登录成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        put,
+        path = "/api/auth/password",
+        tag = "用户管理",
+        security(
+            ("bearer_auth" = [])
+        ),
+        request_body = ChangePasswordRequest,
+        responses(
+            (status = 200, description = "修改密码成功", body = AppResponse<EmptyData>),
+            (status = 400, description = "参数校验失败"),
+            (status = 403, description = "密码错误，请检查您的输入是否正确")
+        )
+    )
+)]
+#[tracing::instrument(
+    name = "修改用户密码",
+    skip(app_state, req, claims),
+    fields(
+        user_id = %claims.sub,
+        username = %claims.username
+    )
+)]
+pub async fn change_password_handler(
+    app_state: web::Data<AppState>,
+    req: web::Json<ChangePasswordRequest>,
+    claims: AuthenticatedUser,
+) -> Result<impl Responder, AppError> {
+    let change_password_body = ChangePasswrod::try_from_request(req.0)
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    validate_user_password(
+        &claims.username,
+        change_password_body.raw_password,
+        &app_state.pool,
+    )
+    .await
+    .map_err(|_| AppError::PasswordWrong)?;
+
+    change_user_password(
+        &app_state.pool,
+        claims.sub,
+        change_password_body.new_password,
+    )
+    .await?;
+
+    Ok(AppResponse::ok_msg("修改密码成功"))
 }
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
@@ -149,12 +208,12 @@ pub async fn get_stored_credentials(
     Ok(row)
 }
 
-#[tracing::instrument(name = "验证用户登录", skip(pool, password))]
-pub async fn validate_user_login(
+#[tracing::instrument(name = "校验用户密码", skip(pool, password))]
+pub async fn validate_user_password(
     username: &str,
     password: SecretString,
     pool: &PgPool,
-) -> Result<Uuid, AppError> {
+) -> Result<Uuid, anyhow::Error> {
     let mut user_id = None;
     let mut expected_password_hash = SecretString::from(
         "$argon2id$v=19$m=15000,t=2,p=1$\
@@ -171,11 +230,9 @@ pub async fn validate_user_login(
         expected_password_hash = saved_passwrod_hash;
     }
 
-    verify_password(password, expected_password_hash)
-        .await
-        .map_err(|_| AppError::LoginFailed)?;
+    verify_password(password, expected_password_hash).await?;
 
-    user_id.ok_or(AppError::LoginFailed)
+    user_id.ok_or(anyhow::anyhow!("用户不存在"))
 }
 
 #[tracing::instrument(name = "生成JWT令牌", skip(jwt_config))]
@@ -187,4 +244,32 @@ async fn generate_jwt(
     jwt_config
         .generate_jwt_token(user_id, username)
         .map_err(|e| AppError::UnexpectedError(e.into()))
+}
+
+#[tracing::instrument(name = "修改用户密码", skip(pool, new_password))]
+async fn change_user_password(
+    pool: &PgPool,
+    user_id: Uuid,
+    new_password: SecretString,
+) -> Result<(), AppError> {
+    let new_password_hash = hash_password(new_password)
+        .await
+        .map_err(AppError::UnexpectedError)?;
+
+    sqlx::query!(
+        r#"
+            UPDATE sys_user
+            SET password_hash = $1
+            WHERE user_id = $2
+        "#,
+        new_password_hash.expose_secret(),
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    
+    tracing::info!("用户密码修改成功");
+
+    Ok(())
 }

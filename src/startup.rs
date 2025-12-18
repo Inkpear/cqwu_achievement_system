@@ -13,7 +13,7 @@ use crate::{
     common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
     middleware::auth::mw_authentication,
-    modules::{health_check::health_check_handler, user},
+    modules::{auth, health_check::health_check_handler},
 };
 
 #[cfg(feature = "swagger")]
@@ -45,10 +45,20 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, a
 
         app = app
             .route("/health_check", web::get().to(health_check_handler))
-            // public routes
-            .service(web::scope("/api").configure(user::config))
+            .route(
+                "/api/auth/login",
+                web::post().to(auth::routes::login_user_handler),
+            )
+            .route(
+                "/api/auth/register",
+                web::post().to(auth::routes::register_user_handler),
+            )
             // protected routes
-            .service(web::scope("/api").wrap(from_fn(mw_authentication)));
+            .service(
+                web::scope("/api")
+                    .wrap(from_fn(mw_authentication))
+                    .configure(auth::config),
+            );
 
         app
     })

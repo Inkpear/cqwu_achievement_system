@@ -13,7 +13,7 @@ use crate::{
     },
     middleware::auth::AuthenticatedUser,
     modules::auth::model::{
-        ChangePasswordRequest, ChangePassword, LoginForm, LoginRequest, LoginResponse,
+        ChangePassword, ChangePasswordRequest, LoginForm, LoginRequest, LoginResponse,
         RegisterUser, RegisterUserRequest, UserResponse,
     },
     utils::{

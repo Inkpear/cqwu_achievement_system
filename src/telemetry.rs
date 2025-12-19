@@ -27,7 +27,17 @@ where
             log_level,
         } = log_settings;
 
-        let file_appender = tracing_appender::rolling::daily(log_path, log_prefix);
+        let file_appender = if log_prefix.ends_with(".log") {
+            tracing_appender::rolling::daily(log_path, log_prefix)
+        } else {
+            let rotation = tracing_appender::rolling::Rotation::DAILY;
+            tracing_appender::rolling::Builder::new()
+                .rotation(rotation)
+                .filename_prefix(&log_prefix)
+                .filename_suffix("log")
+                .build(log_path)
+                .expect("Failed to initialize rolling file appender")
+        };
         let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
 
         let file_layer = BunyanFormattingLayer::new(name, non_blocking_file)

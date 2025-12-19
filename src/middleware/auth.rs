@@ -62,46 +62,77 @@ impl Deref for AuthenticatedUser {
     }
 }
 
-#[tracing::instrument(name = "校验认证令牌", skip(req, next))]
+#[tracing::instrument(
+    name = "校验认证令牌",
+    skip(req, next),
+    fields(
+        user_id = tracing::field::Empty,
+        username = tracing::field::Empty
+    )
+    )]
 pub async fn mw_authentication(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
-    let auth_result = {
-        let app_state = req
-            .app_data::<web::Data<AppState>>()
-            .ok_or(AppError::UnexpectedError(anyhow::anyhow!(
-                "AppState missing"
-            )))?;
-        let jwt_config = &app_state.jwt_config;
+    let app_state = req
+        .app_data::<web::Data<AppState>>()
+        .ok_or(AppError::UnexpectedError(anyhow::anyhow!(
+            "AppState missing"
+        )))?;
+    let jwt_config = &app_state.jwt_config;
+    let token = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
 
-        let token = req
-            .headers()
-            .get("Authorization")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "));
+    let mut reason = None;
+    let auth_result = match token {
+        Some(t) => match jwt_config.verify_jwt_token(t) {
+            Ok(claims) => {
+                tracing::Span::current().record("user_id", &tracing::field::display(claims.sub));
+                tracing::Span::current()
+                    .record("username", &tracing::field::display(&claims.username));
 
-        match token {
-            Some(t) => match jwt_config.verify_jwt_token(t) {
-                Ok(claims) => {
-                    check_user_enabled(&app_state.pool, &claims).await?;
+                if let Err(e) = check_user_enabled(&app_state.pool, &claims).await {
+                    reason = Some("用户被禁用");
+                    Err(e.into())
+                } else {
                     Ok(AuthenticatedUser(claims))
                 }
-                Err(e) => match e.kind() {
-                    ErrorKind::ExpiredSignature => Err(AppError::JwtExpired),
-                    _ => Err(AppError::Unauthorized),
-                },
+            }
+            Err(e) => match e.kind() {
+                ErrorKind::ExpiredSignature => {
+                    reason = Some("令牌已过期");
+                    Err(AppError::JwtExpired)
+                }
+                _ => {
+                    reason = Some("令牌无效");
+                    tracing::warn!("JWT 令牌无效: {:?}", e.kind());
+                    Err(AppError::Unauthorized)
+                }
             },
-            None => Err(AppError::Unauthorized),
+        },
+        None => {
+            reason = Some("缺少令牌");
+            Err(AppError::Unauthorized)
         }
     };
 
     match auth_result {
         Ok(user) => {
+            tracing::info!("认证成功");
             req.extensions_mut().insert(user);
             next.call(req).await
         }
-        Err(e) => Err(e.into()),
+        Err(e) => {
+            tracing::warn!(
+                "用户在访问{}时被拦截，原因：{}",
+                req.path(),
+                reason.unwrap_or("未知原因")
+            );
+            Err(e.into())
+        }
     }
 }
 

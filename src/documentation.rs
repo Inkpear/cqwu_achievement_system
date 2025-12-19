@@ -1,5 +1,7 @@
 use crate::common::response::{AppResponse, EmptyData};
+use crate::modules::admin::models::{RegisterUserRequest, UserResponse};
 use crate::modules::auth::model::*;
+use crate::modules::user::models::ChangePasswordRequest;
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -8,9 +10,9 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        crate::modules::auth::routes::register_user_handler,
+        crate::modules::admin::routes::create_user_handler,
         crate::modules::auth::routes::login_user_handler,
-        crate::modules::auth::routes::change_password_handler
+        crate::modules::user::routes::change_password_handler
     ),
     components(
         schemas(
@@ -27,7 +29,9 @@ use utoipa::{
     ),
     modifiers(&SecurityAddon),
     tags(
-        (name = "用户管理", description = "用户注册、登录与信息管理")
+        (name = "用户管理", description = "基础用户接口"),
+        (name = "用户认证", description = "包含登陆接口"),
+        (name = "管理员操作", description = "管理员接口, 默认需要管理员账户")
     ),
     info(
         title = "高校成果收集系统 API",

@@ -12,3 +12,5 @@ dev = "run --features swagger"
 prod = "build --release --no-default-features"
 # 开发测试（带文档）
 test-dev = "test --features swagger"
+# 语法检查 (带文档)
+check-dev = "check --features swagger"

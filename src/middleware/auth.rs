@@ -12,10 +12,11 @@ use actix_web::{
 };
 use jsonwebtoken::errors::ErrorKind;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::{
     common::{app_state::AppState, error::AppError},
-    utils::jwt::Claims,
+    utils::jwt::{Claims, JwtConfig},
 };
 
 #[derive(Clone)]
@@ -63,81 +64,46 @@ impl Deref for AuthenticatedUser {
 }
 
 #[tracing::instrument(
-    name = "校验认证令牌",
+    name = "用户认证",
     skip(req, next),
     fields(
         user_id = tracing::field::Empty,
-        username = tracing::field::Empty
+        username = tracing::field::Empty,
     )
-    )]
+)]
 pub async fn mw_authentication(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
-    let app_state = req
-        .app_data::<web::Data<AppState>>()
-        .ok_or(AppError::UnexpectedError(anyhow::anyhow!(
-            "AppState missing"
-        )))?;
+    let app_state: &web::Data<AppState> =
+        req.app_data()
+            .ok_or(AppError::UnexpectedError(anyhow::anyhow!(
+                "AppState missing"
+            )))?;
+    let token = parse_token(&req)?;
     let jwt_config = &app_state.jwt_config;
-    let token = req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
+    let claims = check_token(jwt_config, token)?;
 
-    let mut reason = None;
-    let auth_result = match token {
-        Some(t) => match jwt_config.verify_jwt_token(t) {
-            Ok(claims) => {
-                tracing::Span::current().record("user_id", &tracing::field::display(claims.sub));
-                tracing::Span::current()
-                    .record("username", &tracing::field::display(&claims.username));
+    tracing::Span::current().record("user_id", &tracing::field::display(claims.sub));
+    tracing::Span::current().record("username", &tracing::field::display(&claims.username));
 
-                if let Err(e) = check_user_enabled(&app_state.pool, &claims).await {
-                    reason = Some("用户被禁用");
-                    Err(e.into())
-                } else {
-                    Ok(AuthenticatedUser(claims))
-                }
-            }
-            Err(e) => match e.kind() {
-                ErrorKind::ExpiredSignature => {
-                    reason = Some("令牌已过期");
-                    Err(AppError::JwtExpired)
-                }
-                _ => {
-                    reason = Some("令牌无效");
-                    tracing::warn!("JWT 令牌无效: {:?}", e.kind());
-                    Err(AppError::Unauthorized)
-                }
-            },
-        },
-        None => {
-            reason = Some("缺少令牌");
-            Err(AppError::Unauthorized)
-        }
-    };
-
-    match auth_result {
-        Ok(user) => {
-            tracing::info!("认证成功");
-            req.extensions_mut().insert(user);
-            next.call(req).await
-        }
-        Err(e) => {
-            tracing::warn!(
-                "用户在访问{}时被拦截，原因：{}",
-                req.path(),
-                reason.unwrap_or("未知原因")
-            );
-            Err(e.into())
-        }
+    check_user_enabled(&app_state.pool, &claims).await?;
+    if let UserRole::User = claims.role {
+        check_user_role(
+            claims.sub,
+            req.path(),
+            req.method().as_str(),
+            &app_state.pool,
+        )
+        .await?;
     }
+
+    req.extensions_mut().insert(AuthenticatedUser(claims));
+    next.call(req).await
 }
 
 #[tracing::instrument(name = "检查用户是否被禁用", skip(pool, claims))]
-pub async fn check_user_enabled(pool: &PgPool, claims: &Claims) -> Result<(), AppError> {
+async fn check_user_enabled(pool: &PgPool, claims: &Claims) -> Result<(), AppError> {
     let row = sqlx::query!(
         r#"
         SELECT is_active
@@ -151,8 +117,74 @@ pub async fn check_user_enabled(pool: &PgPool, claims: &Claims) -> Result<(), Ap
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     if !row.is_active {
+        tracing::warn!("{} 已被禁用", claims.username);
         return Err(AppError::UserDisabled);
     }
 
     Ok(())
+}
+
+#[tracing::instrument(name = "校验认证令牌", skip(jwt_config, token))]
+fn check_token(jwt_config: &JwtConfig, token: &str) -> Result<Claims, AppError> {
+    match jwt_config.verify_jwt_token(token) {
+        Ok(claims) => Ok(claims),
+        Err(e) => match e.kind() {
+            ErrorKind::ExpiredSignature => {
+                tracing::warn!("令牌已过期");
+                Err(AppError::JwtExpired)
+            }
+            _ => {
+                tracing::warn!("JWT 令牌无效: {:?}", e.kind());
+                Err(AppError::Unauthorized)
+            }
+        },
+    }
+}
+
+#[tracing::instrument(name = "提取令牌", skip(req))]
+fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
+    Ok(req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or_else(|| {
+            tracing::warn!("无法提取令牌");
+            AppError::Unauthorized
+        })?)
+}
+
+#[tracing::instrument(name = "检查用户权限", skip(user_id, path, method, pool))]
+async fn check_user_role(
+    user_id: Uuid,
+    path: &str,
+    method: &str,
+    pool: &PgPool,
+) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM sys_user_permission up
+            JOIN sys_permission p ON up.permission_id = p.permission_id
+            WHERE up.user_id = $1
+                AND (p.http_method::text = $2 OR p.http_method::text = 'ALL')
+                AND $3 LIKE (p.api_path || '%')
+                AND (up.expires_at IS NULL OR up.expires_at > NOW())
+        ) as "has_permission!"
+        "#,
+        user_id,
+        method,
+        path
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.has_permission {
+        Ok(())
+    } else {
+        tracing::warn!("用户 {} 没有访问 {} {} 的权限", user_id, method, path);
+        Err(AppError::Forbidden)
+    }
 }

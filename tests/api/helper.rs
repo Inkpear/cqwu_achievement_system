@@ -81,7 +81,7 @@ impl TestApp {
 
     pub async fn post_register(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/auth/register", self.address))
+            .post(&format!("{}/api/admin/create_user", self.address))
             .json(body)
             .send()
             .await
@@ -127,7 +127,7 @@ impl TestApp {
         body: &Body,
     ) -> reqwest::Response {
         self.api_client
-            .put(&format!("{}/api/auth/password", self.address))
+            .put(&format!("{}/api/user/password", self.address))
             .json(body)
             .send()
             .await
@@ -151,6 +151,21 @@ impl TestUser {
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
             role: UserRole::User,
+        }
+    }
+
+    pub async fn default_admin(pool: &PgPool) -> Self {
+        let row = sqlx::query!("SELECT user_id FROM sys_user WHERE username = 'admin'")
+            .fetch_one(pool)
+            .await
+            .expect("Failed to fetch admin ID");
+
+        Self {
+            user_id: Some(row.user_id),
+            username: "admin".to_string(),
+            nickname: "系统管理员".to_string(),
+            password: "admin123".to_string(),
+            role: UserRole::Admin,
         }
     }
 
@@ -219,12 +234,13 @@ pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, 
     assert_eq!(
         response["code"].as_u64().unwrap(),
         code,
-        "code is not match\nresponse = {:#?}",
+        "code not match in\nresponse = {:#?}",
         response
     );
     assert!(
         response["message"].as_str().unwrap().contains(msg),
-        "message is not match\nresponse = {:#?}",
+        "message: {} is not match in\nresponse = {:#?}",
+        msg,
         response
     );
 }

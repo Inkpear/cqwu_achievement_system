@@ -26,7 +26,10 @@ async fn create_user_persists_to_database() {
 
 #[tokio::test]
 async fn register_user_success() {
-    let app = TestApp::spawn().await;
+    let mut app = TestApp::spawn().await;
+
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
 
     let body = serde_json::json!({
         "username": Uuid::new_v4().to_string(),
@@ -41,7 +44,7 @@ async fn register_user_success() {
         .await
         .expect("Failed to register user");
 
-    check_response_code_and_message(&response, 201, "注册成功");
+    check_response_code_and_message(&response, 201, "创建用户成功");
 
     let response_body = &response["data"];
 
@@ -58,7 +61,10 @@ async fn register_user_success() {
 
 #[tokio::test]
 async fn register_user_is_rejected_when_username_already_exists() {
-    let app = TestApp::spawn().await;
+    let mut app = TestApp::spawn().await;
+
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
 
     let body = serde_json::json!({
         "username": "duplicate_user",
@@ -73,7 +79,7 @@ async fn register_user_is_rejected_when_username_already_exists() {
         .await
         .expect("Failed to register user");
 
-    check_response_code_and_message(&response, 201, "注册成功");
+    check_response_code_and_message(&response, 201, "创建用户成功");
 
     let duplicate_body = serde_json::json!({
         "username": "duplicate_user",
@@ -93,7 +99,10 @@ async fn register_user_is_rejected_when_username_already_exists() {
 
 #[tokio::test]
 async fn register_user_is_rejected_when_body_is_invalid() {
-    let app = TestApp::spawn().await;
+    let mut app = TestApp::spawn().await;
+
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
 
     let missing_field_cases = vec![
         serde_json::json!({}),
@@ -147,7 +156,7 @@ async fn register_user_is_rejected_when_body_is_invalid() {
 }
 
 #[tokio::test]
-async fn login_success_and_recieved_a_valid_jwt() {
+async fn login_success_and_received_a_valid_jwt() {
     let app = TestApp::spawn().await;
     let mut user = TestUser::new();
     user.store(&app.db_pool).await;
@@ -255,10 +264,9 @@ async fn login_is_rejected_with_missing_credentials() {
 }
 
 #[tokio::test]
-async fn change_passwrod_is_rejected_when_old_password_is_wrong() {
+async fn change_password_is_rejected_when_old_password_is_wrong() {
     let mut app = TestApp::spawn().await;
-    let mut user = TestUser::new();
-    user.store(&app.db_pool).await;
+    let user = TestUser::default_admin(&app.db_pool).await;
 
     app.login(&user).await;
 
@@ -278,10 +286,9 @@ async fn change_passwrod_is_rejected_when_old_password_is_wrong() {
 }
 
 #[tokio::test]
-async fn change_passwrod_success() {
+async fn change_password_success() {
     let mut app = TestApp::spawn().await;
-    let mut user = TestUser::new();
-    user.store(&app.db_pool).await;
+    let user = TestUser::default_admin(&app.db_pool).await;
 
     app.login(&user).await;
 

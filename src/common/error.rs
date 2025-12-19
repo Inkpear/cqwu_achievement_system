@@ -26,7 +26,7 @@ pub enum AppError {
     UserDisabled,
 
     #[error("用户权限不足")]
-    UserRoleNotEnough,
+    Forbidden,
 
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
@@ -44,7 +44,7 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::PasswordWrong | AppError::UserRoleNotEnough => StatusCode::FORBIDDEN,
+            AppError::PasswordWrong | AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::LoginFailed
             | AppError::Unauthorized
             | AppError::JwtExpired

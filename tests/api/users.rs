@@ -198,7 +198,7 @@ async fn login_is_rejected_with_invalid_credentials() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 403, "登录失败，请检查用户名或密码是否正确");
+    check_response_code_and_message(&response, 401, "登录失败，请检查用户名或密码是否正确");
 
     let body = serde_json::json!({
         "username": "wrong_username",
@@ -212,7 +212,7 @@ async fn login_is_rejected_with_invalid_credentials() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 403, "登录失败，请检查用户名或密码是否正确");
+    check_response_code_and_message(&response, 401, "登录失败，请检查用户名或密码是否正确");
 }
 
 #[tokio::test]

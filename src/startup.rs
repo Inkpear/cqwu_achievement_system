@@ -22,7 +22,7 @@ static SWAGGER_INFO: std::sync::LazyLock<()> = std::sync::LazyLock::new(|| {
 });
 
 #[cfg(feature = "swagger")]
-use crate::documention::ApiDoc;
+use crate::documentation::ApiDoc;
 
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, anyhow::Error> {
     let app_state = web::Data::new(app_state);

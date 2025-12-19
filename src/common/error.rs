@@ -44,12 +44,11 @@ impl ResponseError for AppError {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::LoginFailed | AppError::PasswordWrong | AppError::UserRoleNotEnough => {
-                StatusCode::FORBIDDEN
-            }
-            AppError::Unauthorized | AppError::JwtExpired | AppError::UserDisabled => {
-                StatusCode::UNAUTHORIZED
-            }
+            AppError::PasswordWrong | AppError::UserRoleNotEnough => StatusCode::FORBIDDEN,
+            AppError::LoginFailed
+            | AppError::Unauthorized
+            | AppError::JwtExpired
+            | AppError::UserDisabled => StatusCode::UNAUTHORIZED,
         }
     }
 

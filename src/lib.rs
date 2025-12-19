@@ -1,7 +1,7 @@
 pub mod common;
 pub mod configuration;
 #[cfg(feature = "swagger")]
-pub mod documention;
+pub mod documentation;
 pub mod domain;
 pub mod middleware;
 pub mod modules;

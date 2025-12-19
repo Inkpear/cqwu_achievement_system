@@ -13,7 +13,7 @@ use crate::{
     },
     middleware::auth::AuthenticatedUser,
     modules::auth::model::{
-        ChangePasswordRequest, ChangePasswrod, LoginForm, LoginRequest, LoginResponse,
+        ChangePasswordRequest, ChangePassword, LoginForm, LoginRequest, LoginResponse,
         RegisterUser, RegisterUserRequest, UserResponse,
     },
     utils::{
@@ -85,7 +85,7 @@ pub async fn register_user_handler(
         responses(
             (status = 200, description = "登录成功", body = AppResponse<LoginResponse>),
             (status = 400, description = "参数校验失败"),
-            (status = 403, description = "登录失败，请检查用户名或密码是否正确")
+            (status = 401, description = "登录失败，请检查用户名或密码是否正确")
         )
     )
 )]
@@ -141,7 +141,7 @@ pub async fn change_password_handler(
     req: web::Json<ChangePasswordRequest>,
     claims: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
-    let change_password_body = ChangePasswrod::try_from_request(req.0)
+    let change_password_body = ChangePassword::try_from_request(req.0)
         .map_err(|e| AppError::ValidationError(e.to_string()))?;
 
     validate_user_password(
@@ -230,13 +230,13 @@ pub async fn validate_user_password(
             .to_string(),
     );
 
-    if let Some((saved_user_id, saved_passwrod_hash, saved_role)) =
+    if let Some((saved_user_id, saved_password_hash, saved_role)) =
         get_stored_credentials(username, pool)
             .await
             .map_err(AppError::UnexpectedError)?
     {
         user_id = Some(saved_user_id);
-        expected_password_hash = saved_passwrod_hash;
+        expected_password_hash = saved_password_hash;
         role = saved_role;
     }
 

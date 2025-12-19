@@ -106,15 +106,15 @@ pub struct ChangePasswordRequest {
     pub new_password: String,
 }
 
-pub struct ChangePasswrod {
+pub struct ChangePassword {
     pub raw_password: SecretString,
     pub new_password: SecretString,
 }
 
-impl ChangePasswrod {
+impl ChangePassword {
     pub fn try_from_request(req: ChangePasswordRequest) -> Result<Self, ValidationErrors> {
         req.validate()?;
-        Ok(ChangePasswrod {
+        Ok(ChangePassword {
             raw_password: SecretString::from(req.raw_password),
             new_password: SecretString::from(req.new_password),
         })

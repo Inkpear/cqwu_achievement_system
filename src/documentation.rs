@@ -1,5 +1,5 @@
 use crate::common::response::{AppResponse, EmptyData};
-use crate::modules::admin::models::{RegisterUserRequest, UserResponse};
+use crate::modules::admin::models::{ModifyUserStatusRequest, RegisterUserRequest, UserResponse};
 use crate::modules::auth::model::*;
 use crate::modules::user::models::ChangePasswordRequest;
 use utoipa::{
@@ -13,6 +13,7 @@ use utoipa::{
         crate::modules::admin::routes::create_user_handler,
         crate::modules::auth::routes::login_user_handler,
         crate::modules::user::routes::change_password_handler
+        crate::modules::admin::routes::modify_user_status_handler
     ),
     components(
         schemas(
@@ -21,6 +22,7 @@ use utoipa::{
             LoginRequest,
             LoginResponse,
             ChangePasswordRequest,
+            ModifyUserStatusRequest,
             AppResponse<UserResponse>,
             AppResponse<LoginResponse>,
             AppResponse<EmptyData>,

@@ -1,4 +1,5 @@
 use actix_web::{HttpResponse, ResponseError, body::BoxBody, http::StatusCode};
+use uuid::Uuid;
 
 use crate::common::response::AppResponse;
 
@@ -22,11 +23,23 @@ pub enum AppError {
     #[error("密码错误，请检查您的输入是否正确")]
     PasswordWrong,
 
-    #[error("用户已被禁用，请联系管理员")]
+    #[error("账户已被禁用，请联系管理员")]
     UserDisabled,
 
     #[error("用户权限不足")]
     Forbidden,
+
+    #[error("数据未发生变化")]
+    DataNotChanged,
+
+    #[error("用户不存在")]
+    UserNotFound,
+
+    #[error("存在更宽泛的API访问规则: {0}")]
+    ApiRuleConflict(Uuid),
+
+    #[error("API访问规则不存在")]
+    ApiRuleNotFound,
 
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
@@ -42,13 +55,16 @@ impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            AppError::UserAlreadyExists => StatusCode::CONFLICT,
+            AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::PasswordWrong | AppError::Forbidden => StatusCode::FORBIDDEN,
-            AppError::LoginFailed
-            | AppError::Unauthorized
-            | AppError::JwtExpired
-            | AppError::UserDisabled => StatusCode::UNAUTHORIZED,
+            AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
+            AppError::UserNotFound | AppError::ApiRuleNotFound => StatusCode::NOT_FOUND,
+            AppError::PasswordWrong | AppError::Forbidden | AppError::UserDisabled => {
+                StatusCode::FORBIDDEN
+            }
+            AppError::LoginFailed | AppError::Unauthorized | AppError::JwtExpired => {
+                StatusCode::UNAUTHORIZED
+            }
         }
     }
 

@@ -30,6 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
 utoipa = { version = "5", features = ["actix_extras", "uuid", "chrono", "debug"], optional = true }
 utoipa-swagger-ui = { version = "8", features = ["actix-web"], optional = true }
+regex = "1"
 
 [dependencies.sqlx]
 version = "0.8.6"

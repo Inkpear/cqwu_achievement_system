@@ -12,7 +12,6 @@ use actix_web::{
 };
 use jsonwebtoken::errors::ErrorKind;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use crate::{
     common::{app_state::AppState, error::AppError},
@@ -154,37 +153,44 @@ fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
         })?)
 }
 
-#[tracing::instrument(name = "检查用户权限", skip(user_id, path, method, pool))]
-async fn check_user_role(
-    user_id: Uuid,
-    path: &str,
-    method: &str,
+const BASIC_PERMISSIONS: &[(&str, &str)] = &[("/api/user/", "ALL")];
+
+#[tracing::instrument(name = "检查用户权限", skip(pool))]
+pub async fn check_user_role(
+    user_id: uuid::Uuid,
+    api_path: &str,
+    http_method: &str,
     pool: &PgPool,
 ) -> Result<(), AppError> {
-    let result = sqlx::query!(
+    for (pattern, method) in BASIC_PERMISSIONS {
+        if api_path.starts_with(pattern) && (*method == "ALL" || *method == http_method) {
+            return Ok(());
+        }
+    }
+
+    let row = sqlx::query!(
         r#"
-        SELECT EXISTS(
+        SELECT EXISTS (
             SELECT 1
-            FROM sys_user_permission up
-            JOIN sys_permission p ON up.permission_id = p.permission_id
-            WHERE up.user_id = $1
-                AND (p.http_method::text = $2 OR p.http_method::text = 'ALL')
-                AND $3 LIKE (p.api_path || '%')
-                AND (up.expires_at IS NULL OR up.expires_at > NOW())
+            FROM sys_access_rule
+            WHERE user_id = $1
+                AND $2 LIKE (api_pattern || '%')
+                AND (http_method = 'ALL' OR http_method = $3)
+                AND (expires_at IS NULL OR expires_at > NOW())
         ) as "has_permission!"
         "#,
         user_id,
-        method,
-        path
+        api_path,
+        http_method
     )
     .fetch_one(pool)
     .await
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
-    if result.has_permission {
-        Ok(())
-    } else {
-        tracing::warn!("用户 {} 没有访问 {} {} 的权限", user_id, method, path);
-        Err(AppError::Forbidden)
+    if !row.has_permission {
+        tracing::warn!("用户 {} 无权访问 {} {}", user_id, http_method, api_path);
+        return Err(AppError::Forbidden);
     }
+
+    Ok(())
 }

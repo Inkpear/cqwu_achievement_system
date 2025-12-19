@@ -36,6 +36,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub api_client: reqwest::Client,
     pub jwt_config: JwtConfig,
+    pub database_config: DatabaseSettings,
 }
 
 impl TestApp {
@@ -76,10 +77,11 @@ impl TestApp {
             db_pool,
             api_client,
             jwt_config,
+            database_config: configuration.database,
         }
     }
 
-    pub async fn post_register(&self, body: &serde_json::Value) -> reqwest::Response {
+    pub async fn post_create_user(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/api/admin/create_user", self.address))
             .json(body)
@@ -122,13 +124,42 @@ impl TestApp {
             .expect("Failed to build client with headers");
     }
 
-    pub async fn post_change_password<Body: serde::Serialize>(
+    pub async fn put_change_password<Body: serde::Serialize>(
         &self,
         body: &Body,
     ) -> reqwest::Response {
         self.api_client
             .put(&format!("{}/api/user/password", self.address))
             .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_modify_user_status(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/modify_user_status", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_grant_user_api_rule(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/admin/grant_user_api_rule", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_revoke_user_api_rule(&self, rule_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/revoke_user_api_rule/{}",
+                self.address, rule_id
+            ))
             .send()
             .await
             .expect("Failed to execute request")

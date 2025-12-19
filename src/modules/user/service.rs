@@ -31,3 +31,26 @@ pub async fn change_user_password(
 
     Ok(())
 }
+
+#[tracing::instrument(name = "检查用户是否存在", skip(pool))]
+pub async fn check_user_exists(pool: &PgPool, user_id: &Uuid) -> Result<(), AppError> {
+    let res = sqlx::query!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+            FROM sys_user
+            WHERE user_id = $1
+        ) as "is_user_existing!"
+        "#,
+        user_id
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if !res.is_user_existing {
+        tracing::warn!("用户不存在: {}", user_id);
+        return Err(AppError::UserNotFound);
+    }
+    Ok(())
+}

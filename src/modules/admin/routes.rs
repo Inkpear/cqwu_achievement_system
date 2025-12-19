@@ -153,7 +153,6 @@ pub async fn grant_user_api_rule_handler(
         "授予用户 API 访问规则成功",
     ))
 }
-
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(

@@ -87,7 +87,7 @@ pub struct GrantUserApiRuleRequest {
     #[validate(regex(path = "API_PATTERN_REGEX", message = "API路径格式不正确"))]
     pub api_pattern: String,
 
-    #[cfg_attr(feature = "swagger", schema(example = "2025-12-19T12:00:00Z" 或 "2025-12-19T12:00:00+08:00"))]
+    #[cfg_attr(feature = "swagger", schema(example = "2025-12-19T12:00:00Z"))]
     #[validate(custom(function = "validate_expires_at"))]
     pub expires_at: Option<DateTime<Utc>>,
 
@@ -104,6 +104,7 @@ fn validate_expires_at(timestamp: &DateTime<Utc>) -> Result<(), validator::Valid
     Ok(())
 }
 
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {

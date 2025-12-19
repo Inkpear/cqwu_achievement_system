@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, ResponseError, http::StatusCode};
+use actix_web::{HttpResponse, ResponseError, body::BoxBody, http::StatusCode};
 
 use crate::common::response::AppResponse;
 
@@ -14,7 +14,7 @@ pub enum AppError {
     LoginFailed,
 
     #[error("令牌已过期，请重新登录")]
-    JwtEexpired,
+    JwtExpired,
 
     #[error("未授权访问，请先登录")]
     Unauthorized,
@@ -39,7 +39,7 @@ impl std::fmt::Debug for AppError {
 }
 
 impl ResponseError for AppError {
-    fn status_code(&self) -> actix_web::http::StatusCode {
+    fn status_code(&self) -> StatusCode {
         match self {
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
@@ -47,13 +47,13 @@ impl ResponseError for AppError {
             AppError::LoginFailed | AppError::PasswordWrong | AppError::UserRoleNotEnough => {
                 StatusCode::FORBIDDEN
             }
-            AppError::Unauthorized | AppError::JwtEexpired | AppError::UserDisabled => {
+            AppError::Unauthorized | AppError::JwtExpired | AppError::UserDisabled => {
                 StatusCode::UNAUTHORIZED
             }
         }
     }
 
-    fn error_response(&self) -> actix_web::HttpResponse<actix_web::body::BoxBody> {
+    fn error_response(&self) -> HttpResponse<BoxBody> {
         let status_code = self.status_code();
         let message = match status_code {
             StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),

@@ -88,7 +88,7 @@ pub async fn mw_authentication(
                     Ok(AuthenticatedUser(claims))
                 }
                 Err(e) => match e.kind() {
-                    ErrorKind::ExpiredSignature => Err(AppError::JwtEexpired),
+                    ErrorKind::ExpiredSignature => Err(AppError::JwtExpired),
                     _ => Err(AppError::Unauthorized),
                 },
             },

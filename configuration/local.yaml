@@ -8,3 +8,6 @@ application:
 
 log:
   log_level: "trace"
+  
+jwt:
+  expiration: 86400 # seconds

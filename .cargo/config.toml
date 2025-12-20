@@ -1,0 +1,16 @@
+# 开发环境配置
+# 开发时默认启用 swagger feature
+
+[build]
+# 开发模式下默认启用 swagger
+# 生产环境构建时使用 --no-default-features 禁用
+
+[alias]
+# 开发运行（带文档）
+dev = "run --features swagger"
+# 生产构建（不带文档）
+prod = "build --release --no-default-features"
+# 开发测试（带文档）
+test-dev = "test --features swagger"
+# 语法检查 (带文档)
+check-dev = "check --features swagger"

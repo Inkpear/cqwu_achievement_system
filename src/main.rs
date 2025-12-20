@@ -7,15 +7,14 @@ use cqwu_achievement_system::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let configuration = get_configuration().expect("Failed to load configuration");
-    
+
     let (subscriber, _guard) = get_subscriber(
         "cqwu_achievement_system".into(),
         "info".into(),
         std::io::stdout,
-        Some(configuration.log.clone())
+        Some(configuration.log.clone()),
     );
     init_subscriber(subscriber);
-
 
     let app = Application::build(configuration).await?;
 

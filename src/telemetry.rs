@@ -1,3 +1,4 @@
+use tokio::task::JoinHandle;
 use tracing::{Subscriber, subscriber::set_global_default};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -26,7 +27,17 @@ where
             log_level,
         } = log_settings;
 
-        let file_appender = tracing_appender::rolling::daily(log_path, log_prefix);
+        let file_appender = if log_prefix.ends_with(".log") {
+            tracing_appender::rolling::daily(log_path, log_prefix)
+        } else {
+            let rotation = tracing_appender::rolling::Rotation::DAILY;
+            tracing_appender::rolling::Builder::new()
+                .rotation(rotation)
+                .filename_prefix(&log_prefix)
+                .filename_suffix("log")
+                .build(log_path)
+                .expect("Failed to initialize rolling file appender")
+        };
         let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
 
         let file_layer = BunyanFormattingLayer::new(name, non_blocking_file)
@@ -48,4 +59,13 @@ where
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to initialize ");
     set_global_default(subscriber).expect("Failed to set subscriber");
+}
+
+pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let current_span = tracing::Span::current();
+    tokio::task::spawn_blocking(move || current_span.in_scope(f))
 }

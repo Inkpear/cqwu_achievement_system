@@ -6,8 +6,11 @@ use argon2::{
 };
 use cqwu_achievement_system::{
     configuration::{DatabaseSettings, get_configuration},
+    middleware::auth::UserRole,
     telemetry::{get_subscriber, init_subscriber},
+    utils::jwt::JwtConfig,
 };
+use reqwest::header::HeaderMap;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
@@ -32,6 +35,8 @@ pub struct TestApp {
     pub port: u16,
     pub db_pool: PgPool,
     pub api_client: reqwest::Client,
+    pub jwt_config: JwtConfig,
+    pub database_config: DatabaseSettings,
 }
 
 impl TestApp {
@@ -45,7 +50,7 @@ impl TestApp {
             c
         };
 
-        let api_client = reqwest::Client::builder().build().unwrap();
+        let api_client = reqwest::Client::new();
 
         let db_pool = configure_database(&configuration.database).await;
 
@@ -53,6 +58,8 @@ impl TestApp {
             cqwu_achievement_system::startup::Application::build(configuration.clone())
                 .await
                 .expect("Failed to build application.");
+
+        let jwt_config = configuration.jwt;
 
         let address = format!(
             "http://{}:{}",
@@ -69,7 +76,112 @@ impl TestApp {
             port,
             db_pool,
             api_client,
+            jwt_config,
+            database_config: configuration.database,
         }
+    }
+
+    pub async fn post_create_user(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/admin/user/create", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_login<Body: serde::Serialize>(&self, form: &Body) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/auth/login", self.address))
+            .form(form)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn login(&mut self, user: &TestUser) {
+        let body = serde_json::json!({
+            "username": user.username,
+            "password": user.password,
+        });
+
+        let jwt = self
+            .post_login(&body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse login response")["data"]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Authorization", format!("Bearer {}", jwt).parse().unwrap());
+
+        self.api_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .expect("Failed to build client with headers");
+    }
+
+    pub async fn put_change_password<Body: serde::Serialize>(
+        &self,
+        body: &Body,
+    ) -> reqwest::Response {
+        self.api_client
+            .put(&format!("{}/api/user/password", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_modify_user_status(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/user/modify_status", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_grant_user_api_rule(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/admin/api_rule/grant", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_revoke_user_api_rule(&self, rule_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/api_rule/revoke/{}",
+                self.address, rule_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_query_user_api_rules(
+        &self,
+        user_id: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> reqwest::Response {
+        let mut request = self
+            .api_client
+            .get(&format!("{}/api/admin/api_rule/query", self.address));
+
+        if let Some(uid) = user_id {
+            request = request.query(&[("user_id", uid)]);
+        }
+        request = request.query(&[("page", &page.to_string())]);
+        request = request.query(&[("page_size", &page_size.to_string())]);
+
+        request.send().await.expect("Failed to execute request")
     }
 }
 
@@ -78,6 +190,7 @@ pub struct TestUser {
     pub username: String,
     pub nickname: String,
     pub password: String,
+    pub role: UserRole,
 }
 
 impl TestUser {
@@ -87,6 +200,32 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
+            role: UserRole::User,
+        }
+    }
+
+    pub async fn default_admin(pool: &PgPool) -> Self {
+        let row = sqlx::query!("SELECT user_id FROM sys_user WHERE username = 'admin'")
+            .fetch_one(pool)
+            .await
+            .expect("Failed to fetch admin ID");
+
+        Self {
+            user_id: Some(row.user_id),
+            username: "admin".to_string(),
+            nickname: "系统管理员".to_string(),
+            password: "admin123".to_string(),
+            role: UserRole::Admin,
+        }
+    }
+
+    pub fn new_admin() -> Self {
+        Self {
+            user_id: None,
+            username: Uuid::new_v4().to_string(),
+            nickname: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+            role: UserRole::Admin,
         }
     }
 
@@ -139,4 +278,19 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .expect("Failed to migrate database");
 
     connection_pool
+}
+
+pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, msg: &str) {
+    assert_eq!(
+        response["code"].as_u64().unwrap(),
+        code,
+        "code not match in\nresponse = {:#?}",
+        response
+    );
+    assert!(
+        response["message"].as_str().unwrap().contains(msg),
+        "message: {} is not match in\nresponse = {:#?}",
+        msg,
+        response
+    );
 }

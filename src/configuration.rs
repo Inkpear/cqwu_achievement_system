@@ -1,6 +1,8 @@
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
+use crate::utils::jwt::JwtConfig;
+
 #[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
@@ -43,7 +45,8 @@ pub struct ApplicationSettings {
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
-    pub log: LogSettings
+    pub log: LogSettings,
+    pub jwt: JwtConfig,
 }
 
 enum Environment {

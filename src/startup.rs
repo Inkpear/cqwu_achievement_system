@@ -1,22 +1,63 @@
 use std::net::TcpListener;
 
-use actix_web::{App, HttpServer, dev::Server, web};
+use actix_web::{App, HttpServer, dev::Server, middleware::from_fn, web};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
+#[cfg(feature = "swagger")]
+use utoipa::OpenApi;
+#[cfg(feature = "swagger")]
+use utoipa_swagger_ui::SwaggerUi;
+
 use crate::{
+    common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
-    modules::health_check::health_check_handler,
+    middleware::auth::mw_authentication,
+    modules::{admin, auth, health_check::health_check_handler, user},
 };
 
-pub async fn run(listener: TcpListener, pool: PgPool) -> Result<Server, anyhow::Error> {
-    let pool = web::Data::new(pool);
+#[cfg(feature = "swagger")]
+static SWAGGER_INFO: std::sync::LazyLock<()> = std::sync::LazyLock::new(|| {
+    tracing::info!("Swagger UI will be available at /swagger-ui/");
+});
+
+#[cfg(feature = "swagger")]
+use crate::documentation::ApiDoc;
+
+pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, anyhow::Error> {
+    let app_state = web::Data::new(app_state);
+
+    #[cfg(feature = "swagger")]
+    let openapi = ApiDoc::openapi();
 
     let server = HttpServer::new(move || {
-        App::new()
+        let mut app = App::new()
             .wrap(TracingLogger::default())
-            .app_data(pool.clone())
-            .service(health_check_handler)
+            .app_data(app_state.clone());
+
+        #[cfg(feature = "swagger")]
+        {
+            app = app.service(
+                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
+            );
+            std::sync::LazyLock::force(&SWAGGER_INFO);
+        }
+
+        app = app
+            .route("/health_check", web::get().to(health_check_handler))
+            .route(
+                "/api/auth/login",
+                web::post().to(auth::routes::login_user_handler),
+            )
+            // protected routes
+            .service(
+                web::scope("/api")
+                    .wrap(from_fn(mw_authentication))
+                    .configure(admin::config)
+                    .configure(user::config),
+            );
+
+        app
     })
     .listen(listener)?
     .run();
@@ -43,9 +84,13 @@ impl Application {
             configuration.application.host, configuration.application.port
         );
 
+        let jwt_config = configuration.jwt;
+
+        let app_state = AppState::new(connection_pool, jwt_config);
+
         let listener = std::net::TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool).await?;
+        let server = run(listener, app_state).await?;
 
         Ok(Self { port, server })
     }

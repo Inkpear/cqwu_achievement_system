@@ -10,3 +10,6 @@ application:
 log:
   log_path: "logs"
   log_prefix: "achievement-api"
+
+jwt:
+  secret: "your-secret-key-change-this-in-production"

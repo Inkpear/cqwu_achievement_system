@@ -174,9 +174,13 @@ pub async fn check_user_role(
             SELECT 1
             FROM sys_access_rule
             WHERE user_id = $1
-                AND $2 LIKE (api_pattern || '%')
                 AND (http_method = 'ALL' OR http_method = $3)
                 AND (expires_at IS NULL OR expires_at > NOW())
+                AND (
+                    $2 LIKE (api_pattern || '%')
+                    OR 
+                    (RIGHT(api_pattern, 1) = '/' AND $2 = RTRIM(api_pattern, '/'))
+                )
         ) as "has_permission!"
         "#,
         user_id,

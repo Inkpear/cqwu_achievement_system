@@ -12,8 +12,8 @@ CREATE TABLE sys_access_rule (
     expires_at TIMESTAMPTZ,
     -- 该权限由谁授予
     granted_by UUID REFERENCES sys_user(user_id) ON DELETE SET NULL,
-    
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- 创建时间(或被更新的时间)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     UNIQUE (user_id, api_pattern, http_method)
 );

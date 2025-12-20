@@ -1,4 +1,5 @@
 use actix_web::{Responder, web};
+use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
@@ -7,23 +8,24 @@ use crate::{
     modules::admin::{
         models::{
             GrantUserApiRuleRequest, GrantUserApiRuleResponse, ModifyUserStatusRequest,
-            RegisterUser, RegisterUserRequest, UserResponse,
+            QueryUserApiRuleRequest, RegisterUser, RegisterUserRequest, UserResponse,
         },
         service::{
-            grant_user_api_access_rule, modify_user_status, revoke_user_api_access_rule, store_user,
+            grant_user_api_access_rule, modify_user_status, query_user_api_access_rules,
+            revoke_user_api_access_rule, store_user,
         },
     },
     utils::password::hash_password,
 };
 
 #[cfg(feature = "swagger")]
-use crate::common::response::EmptyData;
+use crate::common::{pagination::PageData, response::EmptyData};
 
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
         post,
-        path = "/api/admin/create_user",
+        path = "/api/admin/user/create",
         tag = "管理员操作",
         request_body = RegisterUserRequest,
         security(
@@ -73,7 +75,7 @@ pub async fn create_user_handler(
     feature = "swagger",
     utoipa::path(
         patch,
-        path = "/api/admin/modify_user_status",
+        path = "/api/admin/user/modify_status",
         tag = "管理员操作",
         request_body = ModifyUserStatusRequest,
         security(
@@ -111,7 +113,7 @@ pub async fn modify_user_status_handler(
     feature = "swagger",
     utoipa::path(
         post,
-        path = "/api/admin/grant_user_api_rule",
+        path = "/api/admin/api_rule/grant",
         tag = "管理员操作",
         request_body = GrantUserApiRuleRequest,
         security(
@@ -153,11 +155,12 @@ pub async fn grant_user_api_rule_handler(
         "授予用户 API 访问规则成功",
     ))
 }
+
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
         delete,
-        path = "/api/admin/revoke_user_api_rule/{rule_id}",
+        path = "/api/admin/api_rule/revoke/{rule_id}",
         tag = "管理员操作",
         params(
             ("rule_id" = Uuid, Path, description = "API 访问规则 ID")
@@ -174,9 +177,56 @@ pub async fn grant_user_api_rule_handler(
 #[tracing::instrument(name = "撤销用户 API 访问规则", skip(app_state, rule_id))]
 pub async fn revoke_user_api_rule_handler(
     app_state: web::Data<AppState>,
-    rule_id: web::Path<uuid::Uuid>,
+    rule_id: web::Path<Uuid>,
 ) -> Result<impl Responder, AppError> {
     revoke_user_api_access_rule(&app_state.pool, &rule_id).await?;
 
     Ok(AppResponse::ok_msg("撤销用户 API 访问规则成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        get,
+        path = "/api/admin/api_rule/query",
+        tag = "管理员操作",
+        params(
+            ("user_id" = Option<Uuid>, Query, description = "用户 ID"),
+            ("page" = Option<usize>, Query, description = "页码，默认值为 1"),
+            ("page_size" = Option<usize>, Query, description = "每页条数，默认值为 10"),
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "查询用户 API 访问规则成功", body = AppResponse<PageData<GrantUserApiRuleResponse>>),
+            (status = 400, description = "参数校验失败"),
+        )
+    )
+)]
+#[tracing::instrument(
+    name = "查询用户 API 访问规则",
+    skip(app_state, req, _user),
+    fields(
+        op_user_id = %_user.sub,
+        page = %req.page,
+        page_size = %req.page_size,
+        target_id = %req.user_id.unwrap_or(Uuid::nil())
+    )
+)]
+pub async fn query_user_api_access_rules_handler(
+    app_state: web::Data<AppState>,
+    req: web::Query<QueryUserApiRuleRequest>,
+    _user: AuthenticatedUser,
+) -> Result<impl Responder, AppError> {
+    let req = req.into_inner();
+    req.validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    let page_data = query_user_api_access_rules(&app_state.pool, &req).await?;
+
+    Ok(AppResponse::success_msg(
+        page_data,
+        "查询用户 API 访问规则成功",
+    ))
 }

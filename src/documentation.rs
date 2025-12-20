@@ -1,7 +1,8 @@
+use crate::common::pagination::PageData;
 use crate::common::response::{AppResponse, EmptyData};
 use crate::modules::admin::models::*;
-use crate::modules::auth::model::*;
-use crate::modules::user::models::ChangePasswordRequest;
+use crate::modules::auth::models::*;
+use crate::modules::user::models::*;
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -15,7 +16,8 @@ use utoipa::{
         crate::modules::user::routes::change_password_handler,
         crate::modules::admin::routes::modify_user_status_handler,
         crate::modules::admin::routes::grant_user_api_rule_handler,
-        crate::modules::admin::routes::revoke_user_api_rule_handler
+        crate::modules::admin::routes::revoke_user_api_rule_handler,
+        crate::modules::admin::routes::query_user_api_access_rules_handler
     ),
     components(
         schemas(
@@ -27,11 +29,15 @@ use utoipa::{
             ModifyUserStatusRequest,
             GrantUserApiRuleRequest,
             GrantUserApiRuleResponse,
+            QueryUserApiRuleRequest,
+            ApiRuleDTO,
             HttpMethod,
             AppResponse<UserResponse>,
             AppResponse<LoginResponse>,
             AppResponse<GrantUserApiRuleResponse>,
+            AppResponse<PageData<ApiRuleDTO>>,
             AppResponse<EmptyData>,
+            PageData<ApiRuleDTO>,
             EmptyData
         )
     ),

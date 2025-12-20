@@ -83,7 +83,7 @@ impl TestApp {
 
     pub async fn post_create_user(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/admin/create_user", self.address))
+            .post(&format!("{}/api/admin/user/create", self.address))
             .json(body)
             .send()
             .await
@@ -138,7 +138,7 @@ impl TestApp {
 
     pub async fn patch_modify_user_status(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/admin/modify_user_status", self.address))
+            .patch(&format!("{}/api/admin/user/modify_status", self.address))
             .json(body)
             .send()
             .await
@@ -147,7 +147,7 @@ impl TestApp {
 
     pub async fn post_grant_user_api_rule(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/admin/grant_user_api_rule", self.address))
+            .post(&format!("{}/api/admin/api_rule/grant", self.address))
             .json(body)
             .send()
             .await
@@ -157,12 +157,31 @@ impl TestApp {
     pub async fn delete_revoke_user_api_rule(&self, rule_id: &str) -> reqwest::Response {
         self.api_client
             .delete(&format!(
-                "{}/api/admin/revoke_user_api_rule/{}",
+                "{}/api/admin/api_rule/revoke/{}",
                 self.address, rule_id
             ))
             .send()
             .await
             .expect("Failed to execute request")
+    }
+
+    pub async fn get_query_user_api_rules(
+        &self,
+        user_id: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> reqwest::Response {
+        let mut request = self
+            .api_client
+            .get(&format!("{}/api/admin/api_rule/query", self.address));
+
+        if let Some(uid) = user_id {
+            request = request.query(&[("user_id", uid)]);
+        }
+        request = request.query(&[("page", &page.to_string())]);
+        request = request.query(&[("page_size", &page_size.to_string())]);
+
+        request.send().await.expect("Failed to execute request")
     }
 }
 

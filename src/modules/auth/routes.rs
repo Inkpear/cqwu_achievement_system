@@ -3,7 +3,7 @@ use actix_web::{Responder, web};
 
 use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
-    modules::auth::model::{LoginForm, LoginRequest, LoginResponse},
+    modules::auth::models::{LoginForm, LoginRequest, LoginResponse},
 };
 
 #[cfg_attr(

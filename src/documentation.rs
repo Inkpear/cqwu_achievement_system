@@ -18,7 +18,8 @@ use utoipa::{
         crate::modules::admin::routes::grant_user_api_rule_handler,
         crate::modules::admin::routes::revoke_user_api_rule_handler,
         crate::modules::admin::routes::query_user_api_access_rules_handler,
-        crate::modules::admin::routes::query_user_list_handler
+        crate::modules::admin::routes::query_user_list_handler,
+        crate::modules::admin::routes::admin_change_user_password_handler
     ),
     components(
         schemas(
@@ -27,6 +28,7 @@ use utoipa::{
             LoginRequest,
             LoginResponse,
             ChangePasswordRequest,
+            ChangeUserPasswordRequest,
             ModifyUserStatusRequest,
             GrantUserApiRuleRequest,
             GrantUserApiRuleResponse,

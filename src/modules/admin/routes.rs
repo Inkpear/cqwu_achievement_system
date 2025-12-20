@@ -7,12 +7,13 @@ use crate::{
     middleware::auth::AuthenticatedUser,
     modules::admin::{
         models::{
-            GrantUserApiRuleRequest, GrantUserApiRuleResponse, ModifyUserStatusRequest,
-            QueryUserApiRuleRequest, RegisterUser, RegisterUserRequest, QueryUserRequest, UserResponse,
+            ChangeUserPassword, ChangeUserPasswordRequest, GrantUserApiRuleRequest,
+            GrantUserApiRuleResponse, ModifyUserStatusRequest, QueryUserApiRuleRequest,
+            QueryUserRequest, RegisterUser, RegisterUserRequest, UserResponse,
         },
         service::{
-            grant_user_api_access_rule, modify_user_status, query_user_api_access_rules,
-            query_user_list, revoke_user_api_access_rule, store_user,
+            admin_change_user_password, grant_user_api_access_rule, modify_user_status,
+            query_user_api_access_rules, query_user_list, revoke_user_api_access_rule, store_user,
         },
     },
     utils::password::hash_password,
@@ -21,7 +22,7 @@ use crate::{
 #[cfg(feature = "swagger")]
 use crate::common::{pagination::PageData, response::EmptyData};
 #[cfg(feature = "swagger")]
-use crate::modules::admin::models::UserRole;
+use crate::modules::admin::models::{UserDTO, UserRole};
 
 #[cfg_attr(
     feature = "swagger",
@@ -92,7 +93,7 @@ pub async fn create_user_handler(
 )]
 #[tracing::instrument(
     name = "修改用户状态",
-    skip(app_state, req),
+    skip(app_state, req, user),
     fields(
         user_id = %req.user_id,
         is_active = req.is_active
@@ -101,10 +102,17 @@ pub async fn create_user_handler(
 pub async fn modify_user_status_handler(
     app_state: web::Data<AppState>,
     req: web::Json<ModifyUserStatusRequest>,
+    user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     let req = req.into_inner();
     req.validate()
         .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    if user.sub == req.user_id {
+        return Err(AppError::ValidationError(
+            "不能修改自己的用户状态".to_string(),
+        ));
+    }
 
     modify_user_status(&app_state.pool, &req.user_id, req.is_active).await?;
 
@@ -233,7 +241,6 @@ pub async fn query_user_api_access_rules_handler(
     ))
 }
 
-
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
@@ -253,7 +260,7 @@ pub async fn query_user_api_access_rules_handler(
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 200, description = "查询用户成功", body = AppResponse<PageData<UserResponse>>),
+            (status = 200, description = "查询用户成功", body = AppResponse<PageData<UserDTO>>),
             (status = 400, description = "参数校验失败"),
         )
     )
@@ -277,4 +284,44 @@ pub async fn query_user_list_handler(
     let page_data = query_user_list(&app_state.pool, &req).await?;
 
     Ok(AppResponse::success_msg(page_data, "查询用户成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        patch,
+        path = "/api/admin/user/change_password",
+        tag = "管理员操作",
+        request_body = ChangeUserPasswordRequest,
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "修改用户密码成功", body = AppResponse<EmptyData>),
+            (status = 400, description = "参数校验失败"),
+            (status = 404, description = "用户不存在"),
+        )
+    )
+)]
+#[tracing::instrument(
+    name = "管理员修改用户密码",
+    skip(app_state, req),
+    fields(
+        user_id = %req.user_id,
+    )
+)]
+pub async fn admin_change_user_password_handler(
+    app_state: web::Data<AppState>,
+    req: web::Json<ChangeUserPasswordRequest>,
+) -> Result<impl Responder, AppError> {
+    let req = ChangeUserPassword::try_from_request(req.0)
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    let new_password_hash = hash_password(req.new_password)
+        .await
+        .map_err(AppError::UnexpectedError)?;
+
+    admin_change_user_password(&app_state.pool, &req.user_id, &new_password_hash).await?;
+
+    Ok(AppResponse::ok_msg("修改用户密码成功"))
 }

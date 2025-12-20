@@ -188,7 +188,7 @@ pub async fn admin_disable_user_and_user_cannot_operate() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await
@@ -260,4 +260,43 @@ async fn create_user_and_filter_user_query_success() {
             .expect("Failed to parse user_id");
         assert!(user_ids.contains(&uid));
     }
+}
+
+#[tokio::test]
+async fn admin_change_user_password_and_user_login_success_with_new_password() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+    assert!(user.user_id.is_some());
+
+    let body = serde_json::json!({
+        "user_id": user.user_id.unwrap().to_string(),
+        "new_password": "new_secure_password"
+    });
+
+    let response = app
+        .patch_change_user_password(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "修改用户密码成功");
+
+    let login_body = serde_json::json!({
+        "username": user.username,
+        "password": "new_secure_password"
+    });
+
+    let response = app
+        .post_login(&login_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "登录成功");
 }

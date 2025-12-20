@@ -18,7 +18,7 @@ use crate::common::response::EmptyData;
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
-        put,
+        patch,
         path = "/api/user/password",
         tag = "用户管理",
         security(

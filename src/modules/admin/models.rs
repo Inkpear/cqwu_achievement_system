@@ -330,3 +330,32 @@ impl UserRole {
         }
     }
 }
+
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+#[derive(Deserialize, Validate)]
+pub struct ChangeUserPasswordRequest {
+    #[cfg_attr(
+        feature = "swagger",
+        schema(example = "550e8400-e29b-41d4-a716-446655440000")
+    )]
+    pub user_id: Uuid,
+    
+    #[validate(length(min = 6, max = 100, message = "新密码必须在6-100个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "new_password"))]
+    pub new_password: String,
+}
+
+pub struct ChangeUserPassword {
+    pub user_id: Uuid,
+    pub new_password: SecretString,
+}
+
+impl ChangeUserPassword {
+    pub fn try_from_request(req: ChangeUserPasswordRequest) -> Result<Self, ValidationErrors> {
+        req.validate()?;
+        Ok(ChangeUserPassword {
+            user_id: req.user_id,
+            new_password: SecretString::from(req.new_password),
+        })
+    }
+}

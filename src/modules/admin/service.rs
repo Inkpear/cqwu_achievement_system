@@ -1,4 +1,4 @@
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -102,6 +102,12 @@ pub async fn grant_user_api_access_rule(
 
     Ok(row.rule_id)
 }
+
+//entry 
+// /api/user/admin/        /api/user/admin/profile
+//                        /api/user/admins/list
+//                        /api/user/admin/settings
+// /api/conflict/       /api/will_entry
 
 #[tracing::instrument(name = "检查 API 访问规则冲突", skip(pool, req))]
 pub async fn check_api_rule_conflict(
@@ -285,4 +291,33 @@ pub async fn query_user_list(
     let page_data = PageData::from(rows, total, req.page, req.page_size);
 
     Ok(page_data)
+}
+
+#[tracing::instrument(name = "更改用户密码", skip(pool, new_password_hash))]
+pub async fn admin_change_user_password(
+    pool: &PgPool,
+    user_id: &Uuid,
+    new_password_hash: &SecretString,
+) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE sys_user
+        SET password_hash = $1
+        WHERE user_id = $2
+        "#,
+        new_password_hash.expose_secret(),
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("未找到用户以更改密码: {}", user_id);
+        return Err(AppError::UserNotFound);
+    }
+
+    tracing::info!("用户 {} 的密码已更改", user_id);
+
+    Ok(())
 }

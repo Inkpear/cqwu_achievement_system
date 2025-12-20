@@ -121,12 +121,12 @@ impl TestApp {
             .expect("Failed to build client with headers");
     }
 
-    pub async fn put_change_password<Body: serde::Serialize>(
+    pub async fn patch_change_password<Body: serde::Serialize>(
         &self,
         body: &Body,
     ) -> reqwest::Response {
         self.api_client
-            .put(&format!("{}/api/user/password", self.address))
+            .patch(&format!("{}/api/user/password", self.address))
             .json(body)
             .send()
             .await
@@ -185,6 +185,15 @@ impl TestApp {
         self.api_client
             .get(&format!("{}/api/admin/user/query", self.address))
             .query(user_id)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_change_user_password(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/user/password", self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request")

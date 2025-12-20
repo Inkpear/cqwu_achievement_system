@@ -5,7 +5,7 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use cqwu_achievement_system::{
-    configuration::{DatabaseSettings, get_configuration}, middleware::auth::UserRole, telemetry::{get_subscriber, init_subscriber}, utils::jwt::JwtConfig
+    configuration::{DatabaseSettings, get_configuration}, modules::admin::models::UserRole, telemetry::{get_subscriber, init_subscriber}, utils::jwt::JwtConfig
 };
 use reqwest::header::HeaderMap;
 

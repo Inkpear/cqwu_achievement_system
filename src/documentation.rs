@@ -17,7 +17,8 @@ use utoipa::{
         crate::modules::admin::routes::modify_user_status_handler,
         crate::modules::admin::routes::grant_user_api_rule_handler,
         crate::modules::admin::routes::revoke_user_api_rule_handler,
-        crate::modules::admin::routes::query_user_api_access_rules_handler
+        crate::modules::admin::routes::query_user_api_access_rules_handler,
+        crate::modules::admin::routes::query_user_list_handler
     ),
     components(
         schemas(
@@ -30,6 +31,7 @@ use utoipa::{
             GrantUserApiRuleRequest,
             GrantUserApiRuleResponse,
             QueryUserApiRuleRequest,
+            QueryUserRequest,
             ApiRuleDTO,
             HttpMethod,
             AppResponse<UserResponse>,
@@ -37,8 +39,10 @@ use utoipa::{
             AppResponse<GrantUserApiRuleResponse>,
             AppResponse<PageData<ApiRuleDTO>>,
             AppResponse<EmptyData>,
+            AppResponse<PageData<UserDTO>>,
             PageData<ApiRuleDTO>,
-            EmptyData
+            EmptyData,
+            UserRole
         )
     ),
     modifiers(&SecurityAddon),

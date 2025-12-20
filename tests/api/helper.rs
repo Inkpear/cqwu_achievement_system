@@ -5,10 +5,7 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use cqwu_achievement_system::{
-    configuration::{DatabaseSettings, get_configuration},
-    middleware::auth::UserRole,
-    telemetry::{get_subscriber, init_subscriber},
-    utils::jwt::JwtConfig,
+    configuration::{DatabaseSettings, get_configuration}, middleware::auth::UserRole, telemetry::{get_subscriber, init_subscriber}, utils::jwt::JwtConfig
 };
 use reqwest::header::HeaderMap;
 
@@ -183,6 +180,15 @@ impl TestApp {
 
         request.send().await.expect("Failed to execute request")
     }
+
+    pub async fn get_query_user(&self, user_id: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/admin/user/query", self.address))
+            .query(user_id)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {
@@ -200,7 +206,7 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
-            role: UserRole::User,
+            role: UserRole::USER,
         }
     }
 
@@ -215,7 +221,7 @@ impl TestUser {
             username: "admin".to_string(),
             nickname: "系统管理员".to_string(),
             password: "admin123".to_string(),
-            role: UserRole::Admin,
+            role: UserRole::ADMIN,
         }
     }
 
@@ -225,7 +231,7 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
-            role: UserRole::Admin,
+            role: UserRole::ADMIN,
         }
     }
 

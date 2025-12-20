@@ -218,3 +218,46 @@ async fn admin_disable_user_fail_when_user_not_exists() {
 
     check_response_code_and_message(&response, 404, "用户不存在");
 }
+
+#[tokio::test]
+async fn create_user_and_filter_user_query_success() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+
+    let mut user_ids = vec![];
+    for _ in 0..21 {
+        let mut user = TestUser::new();
+        user.store(&app.db_pool).await;
+        assert!(user.user_id.is_some());
+        user_ids.push(user.user_id.unwrap());
+    }
+
+    let query_params = serde_json::json!({
+        "role": "USER",
+        "page": 1,
+        "page_size": 12
+    });
+
+    let response = app
+        .get_query_user(&query_params)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "查询用户成功");
+
+    let data = &response["data"];
+    let users = data["items"].as_array().expect("Data items is not an array");
+    assert_eq!(users.len(), 12);
+    assert_eq!(data["total"].as_i64().unwrap(), 21);
+    assert_eq!(data["total_pages"].as_i64().unwrap(), 2);
+    assert_eq!(data["page"].as_i64().unwrap(), 1);
+
+    for user in users.iter() {
+        let uid = serde_json::from_value::<Uuid>(user["user_id"].clone())
+            .expect("Failed to parse user_id");
+        assert!(user_ids.contains(&uid));
+    }
+}

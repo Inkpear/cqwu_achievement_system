@@ -9,7 +9,8 @@ use crate::{
     },
     modules::{
         admin::models::{
-            ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest, RegisterUser,
+            ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest, RegisterUser, UserDTO,
+            QueryUserRequest,
         },
         user::service::check_user_exists,
     },
@@ -19,13 +20,17 @@ use crate::{
 pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<Uuid, AppError> {
     let result = sqlx::query!(
         r#"
-            INSERT INTO sys_user (username, nickname, password_hash)
-            VALUES($1, $2, $3)
+            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, avatar_url)
+            VALUES($1, $2, $3, $4, $5, $6, $7)
             RETURNING user_id
         "#,
         user.username,
         user.nickname,
-        user.password.expose_secret()
+        user.password.expose_secret(),
+        user.role.as_str(),
+        user.email,
+        user.phone,
+        user.avatar_url,
     )
     .fetch_one(pool)
     .await
@@ -194,6 +199,82 @@ pub async fn query_user_api_access_rules(
         LIMIT $2 OFFSET $3
         "#,
         req.user_id,
+        req.page_size,
+        req.offset()
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    let page_data = PageData::from(rows, total, req.page, req.page_size);
+
+    Ok(page_data)
+}
+
+#[tracing::instrument(name = "查询用户列表", skip(pool, req))]
+pub async fn query_user_list(
+    pool: &PgPool,
+    req: &QueryUserRequest,
+) -> Result<PageData<UserDTO>, AppError> {
+    let count_result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM sys_user
+        WHERE 
+            ($1::UUID IS NULL OR user_id = $1)
+            AND
+            ($2::TEXT IS NULL OR username ILIKE '%' || $2 || '%')
+            AND
+            ($3::TEXT IS NULL OR nickname ILIKE '%' || $3 || '%')
+            AND
+            ($4::BOOL IS NULL OR is_active = $4)
+            AND
+            ($5::TEXT IS NULL OR role = $5)
+        "#,
+        req.user_id,
+        req.username,
+        req.nickname,
+        req.is_active,
+        req.role.as_ref().map(|r| r.as_str())
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    let total = count_result.count.unwrap_or(0);
+
+    let rows = sqlx::query_as!(
+        UserDTO,
+        r#"
+        SELECT 
+            user_id,
+            username,
+            nickname,
+            role,
+            is_active,
+            email,
+            phone,
+            avatar_url,
+            created_at
+        FROM sys_user
+        WHERE 
+            ($1::UUID IS NULL OR user_id = $1)
+            AND
+            ($2::TEXT IS NULL OR username ILIKE '%' || $2 || '%')
+            AND
+            ($3::TEXT IS NULL OR nickname ILIKE '%' || $3 || '%')
+            AND
+            ($4::BOOL IS NULL OR is_active = $4)
+            AND
+            ($5::TEXT IS NULL OR role = $5)
+        ORDER BY created_at DESC
+        LIMIT $6 OFFSET $7
+        "#,
+        req.user_id,
+        req.username,
+        req.nickname,
+        req.is_active,
+        req.role.as_ref().map(|r| r.as_str()),
         req.page_size,
         req.offset()
     )

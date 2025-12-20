@@ -2,7 +2,7 @@ use actix_web::web;
 
 use crate::modules::admin::routes::{
     create_user_handler, grant_user_api_rule_handler, modify_user_status_handler,
-    query_user_api_access_rules_handler, revoke_user_api_rule_handler,
+    query_user_api_access_rules_handler, query_user_list_handler, revoke_user_api_rule_handler,
 };
 
 pub mod models;
@@ -24,7 +24,8 @@ fn user_config(cfg: &mut web::ServiceConfig) {
             .route(
                 "/modify_status",
                 web::patch().to(modify_user_status_handler),
-            ),
+            )
+            .route("/query", web::get().to(query_user_list_handler)),
     );
 }
 

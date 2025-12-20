@@ -8,11 +8,11 @@ use crate::{
     modules::admin::{
         models::{
             GrantUserApiRuleRequest, GrantUserApiRuleResponse, ModifyUserStatusRequest,
-            QueryUserApiRuleRequest, RegisterUser, RegisterUserRequest, UserResponse,
+            QueryUserApiRuleRequest, RegisterUser, RegisterUserRequest, QueryUserRequest, UserResponse,
         },
         service::{
             grant_user_api_access_rule, modify_user_status, query_user_api_access_rules,
-            revoke_user_api_access_rule, store_user,
+            query_user_list, revoke_user_api_access_rule, store_user,
         },
     },
     utils::password::hash_password,
@@ -20,6 +20,8 @@ use crate::{
 
 #[cfg(feature = "swagger")]
 use crate::common::{pagination::PageData, response::EmptyData};
+#[cfg(feature = "swagger")]
+use crate::modules::admin::models::UserRole;
 
 #[cfg_attr(
     feature = "swagger",
@@ -192,8 +194,8 @@ pub async fn revoke_user_api_rule_handler(
         tag = "管理员操作",
         params(
             ("user_id" = Option<Uuid>, Query, description = "用户 ID"),
-            ("page" = Option<usize>, Query, description = "页码，默认值为 1"),
-            ("page_size" = Option<usize>, Query, description = "每页条数，默认值为 10"),
+            ("page" = Option<i64>, Query, description = "页码，默认值为 1"),
+            ("page_size" = Option<i64>, Query, description = "每页条数，默认值为 10"),
         ),
         security(
             ("bearer_auth" = [])
@@ -229,4 +231,50 @@ pub async fn query_user_api_access_rules_handler(
         page_data,
         "查询用户 API 访问规则成功",
     ))
+}
+
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        get,
+        path = "/api/admin/user/query",
+        tag = "管理员操作",
+        params(
+            ("user_id" = Option<Uuid>, Query, description = "用户 ID"),
+            ("username" = Option<String>, Query, description = "用户名，支持模糊查询"),
+            ("nickname" = Option<String>, Query, description = "昵称，支持模糊查询"),
+            ("is_active" = Option<bool>, Query, description = "是否启用"),
+            ("role" = Option<UserRole>, Query, description = "用户角色"),
+            ("page" = Option<i64>, Query, description = "页码，默认值为 1"),
+            ("page_size" = Option<i64>, Query, description = "每页条数，默认值为 10"),
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "查询用户成功", body = AppResponse<PageData<UserResponse>>),
+            (status = 400, description = "参数校验失败"),
+        )
+    )
+)]
+#[tracing::instrument(
+    name = "查询用户列表",
+    skip(app_state, req),
+    fields(
+        page = %req.page,
+        page_size = %req.page_size,
+    )
+)]
+pub async fn query_user_list_handler(
+    app_state: web::Data<AppState>,
+    req: web::Query<QueryUserRequest>,
+) -> Result<impl Responder, AppError> {
+    let req = req.into_inner();
+    req.validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    let page_data = query_user_list(&app_state.pool, &req).await?;
+
+    Ok(AppResponse::success_msg(page_data, "查询用户成功"))
 }

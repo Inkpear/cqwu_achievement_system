@@ -4,9 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    common::error::AppError,
-    middleware::auth::UserRole,
-    utils::{jwt::JwtConfig, password::verify_password},
+    common::error::AppError, modules::admin::models::UserRole, utils::{jwt::JwtConfig, password::verify_password}
 };
 
 #[tracing::instrument(name = "从数据库中获取用户凭据", skip(pool))]
@@ -43,7 +41,7 @@ pub async fn validate_user_password(
     pool: &PgPool,
 ) -> Result<(Uuid, UserRole), anyhow::Error> {
     let mut user_id = None;
-    let mut role = UserRole::User;
+    let mut role = UserRole::USER;
     let mut expected_password_hash = SecretString::from(
         "$argon2id$v=19$m=15000,t=2,p=1$\
         gZiV/M1gPc22ElAH/Jh1Hw$\

@@ -175,7 +175,7 @@ async fn check_user_role(
 
     if !row.has_permission {
         tracing::warn!("用户 {} 无权访问 {} {}", user_id, http_method, api_path);
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("用户权限不足".into()));
     }
 
     Ok(())

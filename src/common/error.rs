@@ -1,12 +1,15 @@
+use std::collections::HashMap;
+
 use actix_web::{HttpResponse, ResponseError, body::BoxBody, http::StatusCode};
 use uuid::Uuid;
+use validator::ValidationErrors;
 
 use crate::common::response::AppResponse;
 
 #[derive(thiserror::Error)]
 pub enum AppError {
-    #[error("参数校验失败: {0}")]
-    ValidationError(String),
+    #[error("参数校验失败")]
+    ValidationError(ValidationErrors),
 
     #[error("用户已经存在，请勿重复注册")]
     UserAlreadyExists,
@@ -26,8 +29,8 @@ pub enum AppError {
     #[error("账户已被禁用，请联系管理员")]
     UserDisabled,
 
-    #[error("用户权限不足")]
-    Forbidden,
+    #[error("{0}")]
+    Forbidden(String),
 
     #[error("数据未发生变化")]
     DataNotChanged,
@@ -59,7 +62,7 @@ impl ResponseError for AppError {
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
             AppError::UserNotFound | AppError::ApiRuleNotFound => StatusCode::NOT_FOUND,
-            AppError::PasswordWrong | AppError::Forbidden | AppError::UserDisabled => {
+            AppError::PasswordWrong | AppError::Forbidden(_) | AppError::UserDisabled => {
                 StatusCode::FORBIDDEN
             }
             AppError::LoginFailed | AppError::Unauthorized | AppError::JwtExpired => {
@@ -70,14 +73,29 @@ impl ResponseError for AppError {
 
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let status_code = self.status_code();
-        let message = match status_code {
-            StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),
-            _ => self.to_string(),
+
+        let response = match self {
+            AppError::ValidationError(errors) => {
+                let field_errors = parse_validation_errors(errors);
+
+                AppResponse::builder()
+                    .code(status_code.clone())
+                    .message("参数校验失败")
+                    .data(serde_json::json!({ "errors": field_errors }))
+                    .build()
+            }
+            _ => {
+                let message = match status_code {
+                    StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),
+                    _ => self.to_string(),
+                };
+                AppResponse::builder()
+                    .code(status_code.clone())
+                    .message(&message)
+                    .data(serde_json::json!({}))
+                    .build()
+            }
         };
-        let response = AppResponse::empty()
-            .code(status_code.clone())
-            .message(&message)
-            .build();
 
         HttpResponse::build(status_code).json(response)
     }
@@ -100,4 +118,18 @@ fn error_chain_fmt(
         current = cause.source();
     }
     Ok(())
+}
+
+fn parse_validation_errors(errors: &ValidationErrors) -> HashMap<String, Vec<String>> {
+    let mut field_errors: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (field, errors) in errors.field_errors().iter() {
+        let messages: Vec<String> = errors
+            .iter()
+            .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+            .collect();
+        field_errors.insert(field.to_string(), messages);
+    }
+
+    field_errors
 }

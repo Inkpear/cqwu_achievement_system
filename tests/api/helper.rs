@@ -198,6 +198,42 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn post_create_template(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/template/create", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_query_templates(
+        &self,
+        template_id: Option<&str>,
+        name: Option<&str>,
+        category: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> reqwest::Response {
+        let mut request = self
+            .api_client
+            .get(&format!("{}/api/template/query", self.address));
+
+        if let Some(id) = template_id {
+            request = request.query(&[("template_id", id)]);
+        }
+        if let Some(n) = name {
+            request = request.query(&[("name", n)]);
+        }
+        if let Some(c) = category {
+            request = request.query(&[("category", c)]);
+        }
+        request = request.query(&[("page", &page.to_string())]);
+        request = request.query(&[("page_size", &page_size.to_string())]);
+
+        request.send().await.expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

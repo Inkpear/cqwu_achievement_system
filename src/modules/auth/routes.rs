@@ -28,8 +28,7 @@ pub async fn login_user_handler(
     app_state: web::Data<AppState>,
     req: web::Form<LoginRequest>,
 ) -> Result<impl Responder, AppError> {
-    let login_form =
-        LoginForm::try_from_request(req.0).map_err(|e| AppError::ValidationError(e.to_string()))?;
+    let login_form = LoginForm::try_from_request(req.0).map_err(AppError::ValidationError)?;
 
     let (user_id, role) =
         validate_user_password(&login_form.username, login_form.password, &app_state.pool)

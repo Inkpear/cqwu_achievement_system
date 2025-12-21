@@ -143,7 +143,7 @@ async fn create_user_user_is_rejected_when_body_is_invalid() {
         ),
     ];
 
-    for (body, expected_message) in validation_cases {
+    for (body, _) in validation_cases {
         let response = app
             .post_create_user(&body)
             .await
@@ -151,7 +151,7 @@ async fn create_user_user_is_rejected_when_body_is_invalid() {
             .await
             .expect("Failed to parse JSON response");
 
-        check_response_code_and_message(&response, 400, expected_message);
+        check_response_code_and_message(&response, 400, "参数校验失败");
     }
 }
 

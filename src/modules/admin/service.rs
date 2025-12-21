@@ -9,8 +9,8 @@ use crate::{
     },
     modules::{
         admin::models::{
-            ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest, RegisterUser, UserDTO,
-            QueryUserRequest,
+            ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest, QueryUserRequest,
+            RegisterUser, UserDTO,
         },
         user::service::check_user_exists,
     },
@@ -46,7 +46,7 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<Uuid, AppE
     Ok(result.user_id)
 }
 
-#[tracing::instrument(name = "修改用户状态", skip(pool))]
+#[tracing::instrument(name = "修改用户状态至数据库", skip(pool))]
 pub async fn modify_user_status(
     pool: &PgPool,
     user_id: &Uuid,
@@ -72,7 +72,7 @@ pub async fn modify_user_status(
     Ok(())
 }
 
-#[tracing::instrument(name = "授予用户 API 访问规则", skip(pool, req))]
+#[tracing::instrument(name = "创建用户 API 访问规则到数据库", skip(pool, req))]
 pub async fn grant_user_api_access_rule(
     pool: &PgPool,
     req: &GrantUserApiRuleRequest,
@@ -102,12 +102,6 @@ pub async fn grant_user_api_access_rule(
 
     Ok(row.rule_id)
 }
-
-//entry 
-// /api/user/admin/        /api/user/admin/profile
-//                        /api/user/admins/list
-//                        /api/user/admin/settings
-// /api/conflict/       /api/will_entry
 
 #[tracing::instrument(name = "检查 API 访问规则冲突", skip(pool, req))]
 pub async fn check_api_rule_conflict(
@@ -146,7 +140,7 @@ pub async fn check_api_rule_conflict(
     Ok(())
 }
 
-#[tracing::instrument(name = "撤销用户 API 访问规则", skip(pool))]
+#[tracing::instrument(name = "从数据库撤销用户 API 访问规则", skip(pool))]
 pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Result<(), AppError> {
     let row = sqlx::query!(
         r#"
@@ -169,7 +163,7 @@ pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Resul
     Ok(())
 }
 
-#[tracing::instrument(name = "查询用户 API 访问规则", skip(pool, req))]
+#[tracing::instrument(name = "从数据库查询用户 API 访问规则", skip(pool, req))]
 pub async fn query_user_api_access_rules(
     pool: &PgPool,
     req: &QueryUserApiRuleRequest,
@@ -217,7 +211,7 @@ pub async fn query_user_api_access_rules(
     Ok(page_data)
 }
 
-#[tracing::instrument(name = "查询用户列表", skip(pool, req))]
+#[tracing::instrument(name = "从数据库查询用户列表", skip(pool, req))]
 pub async fn query_user_list(
     pool: &PgPool,
     req: &QueryUserRequest,
@@ -293,7 +287,7 @@ pub async fn query_user_list(
     Ok(page_data)
 }
 
-#[tracing::instrument(name = "更改用户密码", skip(pool, new_password_hash))]
+#[tracing::instrument(name = "更改用户密码至数据库", skip(pool, new_password_hash))]
 pub async fn admin_change_user_password(
     pool: &PgPool,
     user_id: &Uuid,

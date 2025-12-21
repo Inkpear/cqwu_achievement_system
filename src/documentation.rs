@@ -3,6 +3,7 @@ use crate::common::response::{AppResponse, EmptyData};
 use crate::modules::admin::models::*;
 use crate::modules::auth::models::*;
 use crate::modules::user::models::*;
+use crate::modules::template::models::*;
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -19,7 +20,9 @@ use utoipa::{
         crate::modules::admin::routes::revoke_user_api_rule_handler,
         crate::modules::admin::routes::query_user_api_access_rules_handler,
         crate::modules::admin::routes::query_user_list_handler,
-        crate::modules::admin::routes::admin_change_user_password_handler
+        crate::modules::admin::routes::admin_change_user_password_handler,
+        crate::modules::template::routes::create_template_handler,
+        crate::modules::template::routes::query_templates_handler
     ),
     components(
         schemas(
@@ -44,14 +47,21 @@ use utoipa::{
             AppResponse<PageData<UserDTO>>,
             PageData<ApiRuleDTO>,
             EmptyData,
-            UserRole
+            UserRole,
+            CreateTemplateRequest,
+            TemplateSchema,
+            TemplateDTO,
+            AppResponse<TemplateDTO>,
+            AppResponse<PageData<TemplateDTO>>,
+            PageData<TemplateDTO>
         )
     ),
     modifiers(&SecurityAddon),
     tags(
         (name = "用户管理", description = "基础用户接口"),
         (name = "用户认证", description = "包含登陆接口"),
-        (name = "管理员操作", description = "管理员接口, 默认需要管理员账户")
+        (name = "管理员操作", description = "管理员接口, 默认需要管理员账户"),
+        (name = "模板管理", description = "收集模板管理接口, 需要管理员权限")
     ),
     info(
         title = "高校成果收集系统 API",

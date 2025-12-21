@@ -54,8 +54,7 @@ pub async fn create_user_handler(
     app_state: web::Data<AppState>,
     req: web::Json<RegisterUserRequest>,
 ) -> Result<impl Responder, AppError> {
-    let mut user = RegisterUser::try_from_request(req.0)
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+    let mut user = RegisterUser::try_from_request(req.0).map_err(AppError::ValidationError)?;
 
     user.password = hash_password(user.password)
         .await
@@ -105,13 +104,10 @@ pub async fn modify_user_status_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     let req = req.into_inner();
-    req.validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+    req.validate().map_err(AppError::ValidationError)?;
 
     if user.sub == req.user_id {
-        return Err(AppError::ValidationError(
-            "不能修改自己的用户状态".to_string(),
-        ));
+        return Err(AppError::Forbidden("不能修改自己的用户状态".into()));
     }
 
     modify_user_status(&app_state.pool, &req.user_id, req.is_active).await?;
@@ -157,7 +153,7 @@ pub async fn grant_user_api_rule_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     req.validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(AppError::ValidationError)?;
     let rule_id = grant_user_api_access_rule(&app_state.pool, &req, &user.sub).await?;
 
     Ok(AppResponse::created(
@@ -231,7 +227,7 @@ pub async fn query_user_api_access_rules_handler(
 ) -> Result<impl Responder, AppError> {
     let req = req.into_inner();
     req.validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(AppError::ValidationError)?;
 
     let page_data = query_user_api_access_rules(&app_state.pool, &req).await?;
 
@@ -279,7 +275,7 @@ pub async fn query_user_list_handler(
 ) -> Result<impl Responder, AppError> {
     let req = req.into_inner();
     req.validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(AppError::ValidationError)?;
 
     let page_data = query_user_list(&app_state.pool, &req).await?;
 
@@ -315,7 +311,7 @@ pub async fn admin_change_user_password_handler(
     req: web::Json<ChangeUserPasswordRequest>,
 ) -> Result<impl Responder, AppError> {
     let req = ChangeUserPassword::try_from_request(req.0)
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(AppError::ValidationError)?;
 
     let new_password_hash = hash_password(req.new_password)
         .await

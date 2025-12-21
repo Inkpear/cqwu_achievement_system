@@ -13,7 +13,7 @@ use crate::{
     common::app_state::AppState,
     configuration::{DatabaseSettings, Settings},
     middleware::auth::mw_authentication,
-    modules::{admin, auth, health_check::health_check_handler, user},
+    modules::{admin, auth, health_check::health_check_handler, template, user},
 };
 
 #[cfg(feature = "swagger")]
@@ -54,7 +54,8 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, a
                 web::scope("/api")
                     .wrap(from_fn(mw_authentication))
                     .configure(admin::config)
-                    .configure(user::config),
+                    .configure(user::config)
+                    .configure(template::config),
             );
 
         app

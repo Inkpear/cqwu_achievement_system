@@ -46,7 +46,7 @@ pub async fn change_password_handler(
     claims: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     let change_password_body = ChangePassword::try_from_request(req.0)
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(AppError::ValidationError)?;
 
     validate_user_password(
         &claims.username,

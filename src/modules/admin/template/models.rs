@@ -76,6 +76,7 @@ pub struct TemplateDTO {
     #[cfg_attr(feature = "swagger", schema(example = "json_schema"))]
     pub schema_def: Value,
 
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub created_by: Option<uuid::Uuid>,
     pub updated_at: DateTime<Utc>,
@@ -114,4 +115,11 @@ pub struct UpdateTemplateRequest {
 
     #[validate(custom(function = "validate_template_schema"))]
     pub schema: Option<TemplateSchema>,
+}
+
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+#[derive(Deserialize)]
+pub struct ModifyTemplateStatusRequest {
+    pub template_id: uuid::Uuid,
+    pub is_active: bool,
 }

@@ -17,7 +17,7 @@ pub async fn create_template(
         r#"
         INSERT INTO sys_template (name, category, description, schema_def, created_by)
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING template_id, created_at, updated_at
+        RETURNING template_id, created_at, updated_at, is_active
         "#,
         req.name,
         req.category,
@@ -35,6 +35,7 @@ pub async fn create_template(
         category: req.category,
         description: req.description,
         schema_def: req.schema.schema_def,
+        is_active: row.is_active,
         created_at: row.created_at,
         created_by: Some(user_id),
         updated_at: row.updated_at,
@@ -76,6 +77,7 @@ pub async fn query_templates(
             category,
             description,
             schema_def,
+            is_active,
             created_at,
             created_by,
             updated_at
@@ -125,7 +127,7 @@ pub async fn update_template(
             schema_def = COALESCE($4, schema_def),
             updated_at = NOW()
         WHERE template_id = $5
-        RETURNING template_id, name, category, description, schema_def, created_by, created_at, updated_at
+        RETURNING template_id, name, category, description, schema_def, created_by, created_at, updated_at, is_active
         "#,
         req.name,
         req.category,
@@ -152,6 +154,7 @@ pub async fn update_template(
         category: row.category,
         description: row.description,
         schema_def: row.schema_def,
+        is_active: row.is_active,
         created_at: row.created_at,
         created_by: row.created_by,
         updated_at: row.updated_at,
@@ -179,6 +182,35 @@ pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(
     }
 
     tracing::info!("模板已删除: {}", template_id);
+
+    Ok(())
+}
+
+#[tracing::instrument(name = "修改模板状态至数据库", skip(pool))]
+pub async fn modify_template_status(
+    pool: &PgPool,
+    template_id: uuid::Uuid,
+    is_active: bool,
+) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE sys_template
+        SET is_active = $1, updated_at = NOW()
+        WHERE template_id = $2
+        "#,
+        is_active,
+        template_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("未找到要修改状态的模板: {}", template_id);
+        return Err(AppError::DataNotFound("模板不存在".into()));
+    }
+
+    tracing::info!("模板状态已修改: {} -> {}", template_id, is_active);
 
     Ok(())
 }

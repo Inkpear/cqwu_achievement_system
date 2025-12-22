@@ -257,6 +257,21 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn patch_modify_template_status(
+        &self,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .patch(&format!(
+                "{}/api/admin/template/modify_status",
+                self.address
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

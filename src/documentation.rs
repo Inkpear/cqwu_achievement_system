@@ -26,7 +26,8 @@ use utoipa::{
         crate::modules::admin::template::routes::create_template_handler,
         crate::modules::admin::template::routes::query_templates_handler,
         crate::modules::admin::template::routes::update_template_handler,
-        crate::modules::admin::template::routes::delete_template_handler
+        crate::modules::admin::template::routes::delete_template_handler,
+        crate::modules::admin::template::routes::modify_template_status_handler,
     ),
     components(
         schemas(
@@ -53,7 +54,8 @@ use utoipa::{
             TemplateDTO,
             AppResponse<TemplateDTO>,
             AppResponse<PageData<TemplateDTO>>,
-            PageData<TemplateDTO>
+            PageData<TemplateDTO>,
+            ModifyTemplateStatusRequest,
         )
     ),
     modifiers(&SecurityAddon),

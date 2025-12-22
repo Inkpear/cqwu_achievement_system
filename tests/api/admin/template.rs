@@ -618,3 +618,50 @@ async fn patch_to_update_a_template_and_raw_template_some_value_not_change() {
     assert_eq!(data["category"], "测试");
     assert_eq!(data["description"], "仅更新描述字段");
 }
+
+#[tokio::test]
+async fn modify_template_status_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "状态修改模板",
+        "category": "测试",
+        "description": "用于测试模板状态修改功能",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let modify_status_body = serde_json::json!({
+        "template_id": template_id,
+        "is_active": false
+    });
+
+    let modify_response = app
+        .patch_modify_template_status(&modify_status_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&modify_response, 200, "收集模板状态修改成功");
+}

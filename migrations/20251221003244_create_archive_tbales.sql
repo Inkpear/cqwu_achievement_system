@@ -2,7 +2,7 @@
 CREATE TABLE
     sys_template (
         template_id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-        name VARCHAR(100) NOT NULL UNIQUE, -- 模板名称
+        name VARCHAR(100) NOT NULL, -- 模板名称
         category VARCHAR(50) NOT NULL, -- 分类
         description TEXT,
         schema_def JSONB NOT NULL,

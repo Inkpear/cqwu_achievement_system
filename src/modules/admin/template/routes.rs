@@ -5,8 +5,14 @@ use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
     modules::admin::template::{
-        models::{CreateTemplateRequest, QueryTemplatesRequest, UpdateTemplateRequest},
-        service::{create_template, delete_template, query_templates, update_template},
+        models::{
+            CreateTemplateRequest, ModifyTemplateStatusRequest, QueryTemplatesRequest,
+            UpdateTemplateRequest,
+        },
+        service::{
+            create_template, delete_template, modify_template_status, query_templates,
+            update_template,
+        },
     },
 };
 
@@ -145,4 +151,31 @@ pub async fn delete_template_handler(
     delete_template(&app_state.pool, template_id.into_inner()).await?;
 
     Ok(AppResponse::ok_msg("收集模板删除成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        patch,
+        path = "/api/admin/template/modify_status",
+        tag = "管理员-模板管理",
+        request_body = ModifyTemplateStatusRequest,
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "收集模板状态修改成功"),
+            (status = 400, description = "参数校验失败"),
+            (status = 404, description = "模板不存在"),
+        )
+    )
+)]
+#[tracing::instrument(name = "修改模板状态", skip(app_state, req))]
+pub async fn modify_template_status_handler(
+    app_state: web::Data<AppState>,
+    req: web::Json<ModifyTemplateStatusRequest>,
+) -> Result<impl Responder, AppError> {
+    modify_template_status(&app_state.pool, req.0.template_id, req.0.is_active).await?;
+
+    Ok(AppResponse::ok_msg("收集模板状态修改成功"))
 }

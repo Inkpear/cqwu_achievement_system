@@ -13,6 +13,7 @@ pub fn config(cfg: &mut ServiceConfig) {
             .route(
                 "/delete/{template_id}",
                 web::delete().to(routes::delete_template_handler),
-            ),
+            )
+            .route("/modify_status", web::patch().to(routes::modify_template_status_handler))
     );
 }

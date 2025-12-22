@@ -16,10 +16,6 @@ static API_PATTERN_REGEX: LazyLock<Regex> =
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct GrantUserApiRuleRequest {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Uuid,
 
     #[cfg_attr(feature = "swagger", schema(example = "/api/user/"))]
@@ -29,7 +25,7 @@ pub struct GrantUserApiRuleRequest {
     ))]
     pub api_pattern: String,
 
-    #[cfg_attr(feature = "swagger", schema(example = "2025-12-19T12:00:00Z"))]
+
     #[validate(custom(function = "validate_expires_at"))]
     pub expires_at: Option<DateTime<Utc>>,
 
@@ -52,20 +48,12 @@ fn validate_expires_at(timestamp: &DateTime<Utc>) -> Result<(), validator::Valid
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Serialize)]
 pub struct GrantUserApiRuleResponse {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub rule_id: Uuid,
 }
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct QueryUserApiRuleRequest {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Option<Uuid>,
 
     #[validate(range(min = 1, message = "页码必须大于等于1"))]
@@ -88,10 +76,6 @@ impl QueryUserApiRuleRequest {
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Serialize, Deserialize)]
 pub struct ApiRuleDTO {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub rule_id: Uuid,
 
     #[cfg_attr(feature = "swagger", schema(example = "/api/user/"))]
@@ -100,10 +84,8 @@ pub struct ApiRuleDTO {
     #[cfg_attr(feature = "swagger", schema(example = "GET"))]
     pub http_method: String,
 
-    #[cfg_attr(feature = "swagger", schema(example = "2025-12-19T12:00:00Z"))]
     pub expires_at: Option<DateTime<Utc>>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "2024-01-01T12:00:00Z"))]
     pub created_at: DateTime<Utc>,
 
     #[cfg_attr(feature = "swagger", schema(example = "系统管理员"))]

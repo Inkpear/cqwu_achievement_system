@@ -21,7 +21,7 @@ use crate::common::{pagination::PageData, response::EmptyData};
     utoipa::path(
         post,
         path = "/api/admin/api_rule/grant",
-        tag = "管理员操作",
+        tag = "管理员-API 访问规则管理",
         request_body = GrantUserApiRuleRequest,
         security(
             ("bearer_auth" = [])
@@ -67,7 +67,7 @@ pub async fn grant_user_api_rule_handler(
     utoipa::path(
         delete,
         path = "/api/admin/api_rule/revoke/{rule_id}",
-        tag = "管理员操作",
+        tag = "管理员-API 访问规则管理",
         params(
             ("rule_id" = Uuid, Path, description = "API 访问规则 ID")
         ),
@@ -95,7 +95,7 @@ pub async fn revoke_user_api_rule_handler(
     utoipa::path(
         get,
         path = "/api/admin/api_rule/query",
-        tag = "管理员操作",
+        tag = "管理员-API 访问规则管理",
         params(
             ("user_id" = Option<Uuid>, Query, description = "用户 ID"),
             ("page" = Option<i64>, Query, description = "页码，默认值为 1"),

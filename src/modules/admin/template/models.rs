@@ -62,10 +62,6 @@ fn validate_template_schema(schema: &TemplateSchema) -> Result<(), ValidationErr
 #[derive(Serialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct TemplateDTO {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub template_id: uuid::Uuid,
 
     #[cfg_attr(feature = "swagger", schema(example = "用户信息收集模板"))]
@@ -77,15 +73,11 @@ pub struct TemplateDTO {
     #[cfg_attr(feature = "swagger", schema(example = "用于收集用户基本信息的模板"))]
     pub description: Option<String>,
 
+    #[cfg_attr(feature = "swagger", schema(example = "json_schema"))]
     pub schema_def: Value,
+    
     pub created_at: DateTime<Utc>,
-
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub created_by: uuid::Uuid,
-
     pub updated_at: DateTime<Utc>,
 }
 

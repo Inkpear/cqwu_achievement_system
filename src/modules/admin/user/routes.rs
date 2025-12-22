@@ -26,7 +26,7 @@ use crate::{
     utoipa::path(
         post,
         path = "/api/admin/user/create",
-        tag = "管理员操作",
+        tag = "管理员-用户管理",
         request_body = RegisterUserRequest,
         security(
             ("bearer_auth" = [])
@@ -69,7 +69,7 @@ pub async fn create_user_handler(
     utoipa::path(
         patch,
         path = "/api/admin/user/modify_status",
-        tag = "管理员操作",
+        tag = "管理员-用户管理",
         request_body = ModifyUserStatusRequest,
         security(
             ("bearer_auth" = [])
@@ -111,7 +111,7 @@ pub async fn modify_user_status_handler(
     utoipa::path(
         get,
         path = "/api/admin/user/query",
-        tag = "管理员操作",
+        tag = "管理员-用户管理",
         params(
             ("user_id" = Option<Uuid>, Query, description = "用户 ID"),
             ("username" = Option<String>, Query, description = "用户名，支持模糊查询"),
@@ -155,7 +155,7 @@ pub async fn query_users_handler(
     utoipa::path(
         patch,
         path = "/api/admin/user/change_password",
-        tag = "管理员操作",
+        tag = "管理员-用户管理",
         request_body = ChangeUserPasswordRequest,
         security(
             ("bearer_auth" = [])

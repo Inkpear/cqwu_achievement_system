@@ -75,10 +75,6 @@ impl RegisterUser {
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct ModifyUserStatusRequest {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Uuid,
 
     #[cfg_attr(feature = "swagger", schema(example = "true"))]
@@ -88,10 +84,6 @@ pub struct ModifyUserStatusRequest {
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Serialize, Deserialize)]
 pub struct UserDTO {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Uuid,
 
     #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
@@ -103,7 +95,6 @@ pub struct UserDTO {
     #[cfg_attr(feature = "swagger", schema(example = "true"))]
     pub is_active: bool,
 
-    #[cfg_attr(feature = "swagger", schema(example = "ADMIN"))]
     pub role: UserRole,
 
     #[cfg_attr(feature = "swagger", schema(example = "user@example.com"))]
@@ -118,17 +109,12 @@ pub struct UserDTO {
     )]
     pub avatar_url: Option<String>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "2024-01-01T12:00:00Z"))]
     pub created_at: DateTime<Utc>,
 }
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct QueryUserRequest {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Option<Uuid>,
 
     #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
@@ -142,7 +128,6 @@ pub struct QueryUserRequest {
     #[cfg_attr(feature = "swagger", schema(example = "true"))]
     pub is_active: Option<bool>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "ADMIN"))]
     pub role: Option<UserRole>,
 
     #[cfg_attr(feature = "swagger", schema(example = "1"))]
@@ -165,10 +150,6 @@ impl QueryUserRequest {
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct ChangeUserPasswordRequest {
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "550e8400-e29b-41d4-a716-446655440000")
-    )]
     pub user_id: Uuid,
 
     #[validate(length(min = 6, max = 100, message = "新密码必须在6-100个字符之间"))]

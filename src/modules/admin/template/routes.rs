@@ -17,8 +17,8 @@ use crate::{common::pagination::PageData, modules::admin::template::models::Temp
     feature = "swagger",
     utoipa::path(
         post,
-        path = "/api/template/create",
-        tag = "模板管理",
+        path = "/api/admin/template/create",
+        tag = "管理员-模板管理",
         request_body = CreateTemplateRequest,
         security(
             ("bearer_auth" = [])
@@ -26,7 +26,6 @@ use crate::{common::pagination::PageData, modules::admin::template::models::Temp
         responses(
             (status = 201, description = "创建收集模板成功", body = AppResponse<TemplateDTO>),
             (status = 400, description = "参数校验失败"),
-            (status = 401, description = "未授权访问，请先登录")
         )
     )
 )]
@@ -54,8 +53,8 @@ pub async fn create_template_handler(
     feature = "swagger",
     utoipa::path(
         get,
-        path = "/api/template/query",
-        tag = "模板管理",
+        path = "/api/admin/template/query",
+        tag = "管理员-模板管理",
         params(
             ("template_id" = Option<uuid::Uuid>, Query, description = "模板ID"),
             ("name" = Option<String>, Query, description = "模板名称（模糊查询）"),

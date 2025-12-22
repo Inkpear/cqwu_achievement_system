@@ -62,8 +62,9 @@ use utoipa::{
     tags(
         (name = "用户管理", description = "基础用户接口"),
         (name = "用户认证", description = "包含登陆接口"),
-        (name = "管理员操作", description = "管理员接口, 默认需要管理员账户"),
-        (name = "模板管理", description = "收集模板管理接口, 需要管理员权限")
+        (name = "管理员-模板管理", description = "收集模板管理接口, 需要管理员权限"),
+        (name = "管理员-用户管理", description = "用户管理相关接口, 需要管理员权限"),
+        (name = "管理员-API 访问规则管理", description = "API 访问规则管理相关接口, 需要管理员权限")
     ),
     info(
         title = "高校成果收集系统 API",

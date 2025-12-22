@@ -19,6 +19,8 @@ use crate::{
     utils::jwt::{Claims, JwtConfig},
 };
 
+const BASIC_PERMISSIONS: [(&str, &str); 1] = [("/api/user/", "ALL")];
+
 #[derive(Clone)]
 pub struct AuthenticatedUser(Claims);
 
@@ -137,8 +139,6 @@ fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
         })?)
 }
 
-const BASIC_PERMISSIONS: &[(&str, &str)] = &[("/api/user/", "ALL")];
-
 #[tracing::instrument(name = "检查用户权限", skip(pool))]
 async fn check_user_role(
     user_id: uuid::Uuid,
@@ -147,7 +147,7 @@ async fn check_user_role(
     pool: &PgPool,
 ) -> Result<(), AppError> {
     for (pattern, method) in BASIC_PERMISSIONS {
-        if api_path.starts_with(pattern) && (*method == "ALL" || *method == http_method) {
+        if api_path.starts_with(pattern) && (method == "ALL" || method == http_method) {
             return Ok(());
         }
     }

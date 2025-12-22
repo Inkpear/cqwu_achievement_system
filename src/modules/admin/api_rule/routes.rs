@@ -6,7 +6,7 @@ use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
     modules::admin::api_rule::{
-        models::{GrantUserApiRuleRequest, GrantUserApiRuleResponse, QueryUserApiRuleRequest},
+        models::{GrantUserApiRuleRequest, QueryUserApiRuleRequest},
         service::{
             grant_user_api_access_rule, query_user_api_access_rules, revoke_user_api_access_rule,
         },
@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[cfg(feature = "swagger")]
-use crate::common::pagination::PageData;
+use {crate::common::pagination::PageData, crate::modules::admin::api_rule::models::ApiRuleDTO};
 
 #[cfg_attr(
     feature = "swagger",
@@ -27,7 +27,7 @@ use crate::common::pagination::PageData;
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 201, description = "授予用户 API 访问规则成功", body = AppResponse<GrantUserApiRuleResponse>),
+            (status = 201, description = "授予用户 API 访问规则成功", body = AppResponse<ApiRuleDTO>),
             (status = 400, description = "参数校验失败"),
             (status = 404, description = "用户不存在"),
             (status = 409, description = "存在更宽泛的API访问规则"),
@@ -54,12 +54,9 @@ pub async fn grant_user_api_rule_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     req.validate().map_err(AppError::ValidationError)?;
-    let rule_id = grant_user_api_access_rule(&app_state.pool, &req, &user.sub).await?;
+    let dto = grant_user_api_access_rule(&app_state.pool, &req, &user.sub, &user.username).await?;
 
-    Ok(AppResponse::created(
-        GrantUserApiRuleResponse { rule_id },
-        "授予用户 API 访问规则成功",
-    ))
+    Ok(AppResponse::created(dto, "授予用户 API 访问规则成功"))
 }
 
 #[cfg_attr(
@@ -105,7 +102,7 @@ pub async fn revoke_user_api_rule_handler(
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 200, description = "查询用户 API 访问规则成功", body = AppResponse<PageData<GrantUserApiRuleResponse>>),
+            (status = 200, description = "查询用户 API 访问规则成功", body = AppResponse<PageData<ApiRuleDTO>>),
             (status = 400, description = "参数校验失败"),
         )
     )

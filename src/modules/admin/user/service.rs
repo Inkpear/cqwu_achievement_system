@@ -9,13 +9,12 @@ use crate::{
     },
     modules::{
         admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
-        user::service::check_user_exists,
     },
 };
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
 pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, AppError> {
-    let result = sqlx::query!(
+    let row = sqlx::query!(
         r#"
             INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, avatar_url)
             VALUES($1, $2, $3, $4, $5, $6, $7)
@@ -33,7 +32,7 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
     .await
     .map_err(|e| {
         if let Some(db_error) = e.as_database_error() {
-            if Some(DatabaseErrorCode::USER_ALREADY_EXISTS).eq(&db_error.code().as_deref()) {
+            if Some(DatabaseErrorCode::UNIQUE_VIOLATION).eq(&db_error.code().as_deref()) {
                 return AppError::UserAlreadyExists;
             }
         }
@@ -41,7 +40,7 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
     })?;
 
     let dto = UserDTO {
-        user_id: result.user_id,
+        user_id: row.user_id,
         username: user.username.clone(),
         nickname: user.nickname.clone(),
         role: user.role.clone(),
@@ -49,7 +48,7 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         email: user.email.clone(),
         phone: user.phone.clone(),
         avatar_url: user.avatar_url.clone(),
-        created_at: result.created_at,
+        created_at: row.created_at,
     };
 
     Ok(dto)
@@ -61,9 +60,7 @@ pub async fn modify_user_status(
     user_id: &Uuid,
     is_active: bool,
 ) -> Result<(), AppError> {
-    check_user_exists(pool, user_id).await?;
-
-    sqlx::query!(
+    let row = sqlx::query!(
         r#"
         UPDATE sys_user
         SET is_active = $1
@@ -75,6 +72,11 @@ pub async fn modify_user_status(
     .execute(pool)
     .await
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if row.rows_affected() == 0 {
+        tracing::warn!("未找到用户以修改状态: {}", user_id);
+        return Err(AppError::DataNotFound("用户不存在".into()));
+    }
 
     tracing::info!("用户 {} 状态已修改为 {}", user_id, is_active);
 
@@ -178,7 +180,7 @@ pub async fn admin_change_user_password(
 
     if result.rows_affected() == 0 {
         tracing::warn!("未找到用户以更改密码: {}", user_id);
-        return Err(AppError::UserNotFound);
+        return Err(AppError::DataNotFound("用户不存在".into()));
     }
 
     tracing::info!("用户 {} 的密码已更改", user_id);

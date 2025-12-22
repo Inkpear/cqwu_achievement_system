@@ -272,7 +272,7 @@ async fn query_templates_returns_paginated_results() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 200, "success");
+    check_response_code_and_message(&response, 200, "查询收集模板成功");
 
     let data = &response["data"];
     assert_eq!(data["items"].as_array().unwrap().len(), 3);
@@ -310,7 +310,7 @@ async fn query_templates_by_name() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 200, "success");
+    check_response_code_and_message(&response, 200, "查询收集模板成功");
 
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
@@ -362,7 +362,7 @@ async fn query_templates_by_category() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 200, "success");
+    check_response_code_and_message(&response, 200, "查询收集模板成功");
 
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
@@ -411,7 +411,7 @@ async fn query_templates_by_template_id() {
         .await
         .expect("Failed to parse JSON response");
 
-    check_response_code_and_message(&response, 200, "success");
+    check_response_code_and_message(&response, 200, "查询收集模板成功");
 
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
@@ -446,4 +446,175 @@ async fn admin_can_create_template() {
         .expect("Failed to parse JSON response");
 
     check_response_code_and_message(&response, 201, "收集模板创建成功");
+}
+
+#[tokio::test]
+async fn create_a_template_and_update_it_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "初始模板名称",
+        "category": "初始分类",
+        "description": "初始描述",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let update_body = serde_json::json!({
+        "template_id": template_id,
+        "name": "更新后的模板名称",
+        "category": "更新后的分类",
+        "description": "更新后的描述",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "new_field": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    });
+
+    let update_response = app
+        .patch_update_template(&update_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&update_response, 200, "收集模板更新成功");
+
+    let data = update_response["data"]["name"].as_str().unwrap();
+
+    assert_eq!(data, "更新后的模板名称");
+}
+
+#[tokio::test]
+async fn create_a_template_and_delete_it_then_can_not_query_it() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "待删除模板",
+        "category": "测试",
+        "description": "用于测试删除功能",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let delete_response = app
+        .delete_template(&template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&delete_response, 200, "收集模板删除成功");
+
+    let query_response = app
+        .get_query_templates(Some(&template_id), None, None, 1, 10)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&query_response, 200, "查询收集模板成功");
+
+    let data = &query_response["data"];
+    let list = data["items"].as_array().unwrap();
+
+    assert_eq!(list.len(), 0);
+}
+
+#[tokio::test]
+async fn patch_to_update_a_template_and_raw_template_some_value_not_change() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "部分更新模板",
+        "category": "测试",
+        "description": "用于测试部分更新功能",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let update_body = serde_json::json!({
+        "template_id": template_id,
+        "description": "仅更新描述字段"
+    });
+
+    let update_response = app
+        .patch_update_template(&update_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&update_response, 200, "收集模板更新成功");
+
+    let data = &update_response["data"];
+    assert_eq!(data["name"], "部分更新模板");
+    assert_eq!(data["category"], "测试");
+    assert_eq!(data["description"], "仅更新描述字段");
 }

@@ -2,10 +2,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    common::{error::AppError, pagination::PageData},
-    modules::{
-        admin::api_rule::models::{ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest},
-        user::service::check_user_exists,
+    common::{
+        error::{AppError, DatabaseErrorCode},
+        pagination::PageData,
+    },
+    modules::admin::api_rule::models::{
+        ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest,
     },
 };
 
@@ -15,7 +17,6 @@ pub async fn grant_user_api_access_rule(
     req: &GrantUserApiRuleRequest,
     granted_by: &Uuid,
 ) -> Result<Uuid, AppError> {
-    check_user_exists(pool, &req.user_id).await?;
     check_api_rule_conflict(pool, req).await?;
 
     let row = sqlx::query!(
@@ -35,7 +36,14 @@ pub async fn grant_user_api_access_rule(
     )
     .fetch_one(pool)
     .await
-    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    .map_err(|e| {
+        if let Some(db_error) = e.as_database_error() {
+            if Some(DatabaseErrorCode::FOREIGN_KEY_VIOLATION).eq(&db_error.code().as_deref()) {
+                return AppError::DataNotFound("用户不存在".into());
+            }
+        }
+        AppError::UnexpectedError(e.into())
+    })?;
 
     Ok(row.rule_id)
 }
@@ -92,7 +100,7 @@ pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Resul
 
     if row.rows_affected() == 0 {
         tracing::warn!("未找到要撤销的规则: {}", rule_id);
-        return Err(AppError::ApiRuleNotFound);
+        return Err(AppError::DataNotFound("API访问规则不存在".into()));
     }
 
     tracing::info!("API 访问规则已撤销: {}", rule_id);

@@ -1,9 +1,4 @@
-# 开发环境配置
-# 开发时默认启用 swagger feature
-
 [build]
-# 开发模式下默认启用 swagger
-# 生产环境构建时使用 --no-default-features 禁用
 
 [alias]
 # 开发运行（带文档）

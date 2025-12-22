@@ -5,8 +5,8 @@ use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
     modules::admin::template::{
-        models::{CreateTemplateRequest, QueryTemplatesRequest},
-        service::{create_template, query_templates},
+        models::{CreateTemplateRequest, QueryTemplatesRequest, UpdateTemplateRequest},
+        service::{create_template, delete_template, query_templates, update_template},
     },
 };
 
@@ -63,7 +63,7 @@ pub async fn create_template_handler(
             ("page_size" = i64, Query, description = "每页条数，默认为10")
         ),
         responses(
-            (status = 200, description = "查询收集模板列表成功", body = AppResponse<PageData<TemplateDTO>>),
+            (status = 200, description = "查询收集模板成功", body = AppResponse<PageData<TemplateDTO>>),
             (status = 400, description = "参数校验失败")
         )
     )
@@ -75,5 +75,71 @@ pub async fn query_templates_handler(
 ) -> Result<impl Responder, AppError> {
     let page_data = query_templates(&app_state.pool, &req.0).await?;
 
-    Ok(AppResponse::success(page_data))
+    Ok(AppResponse::success_msg(page_data, "查询收集模板成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        patch,
+        path = "/api/admin/template/update",
+        tag = "管理员-模板管理",
+        request_body = UpdateTemplateRequest,
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "更新收集模板成功", body = AppResponse<TemplateDTO>),
+            (status = 400, description = "参数校验失败"),
+            (status = 404, description = "模板不存在")
+        )
+    )
+)]
+#[tracing::instrument(name = "更新收集模板", skip(app_state, req, user)
+    fields(
+        user_id = %user.sub,
+        username = %user.username,
+    )
+)]
+pub async fn update_template_handler(
+    app_state: web::Data<AppState>,
+    req: web::Json<UpdateTemplateRequest>,
+    user: AuthenticatedUser,
+) -> Result<impl Responder, AppError> {
+    let req = {
+        req.0.validate().map_err(AppError::ValidationError)?;
+        req.0
+    };
+
+    let dto = update_template(&app_state.pool, &user.username, &req).await?;
+
+    Ok(AppResponse::success_msg(dto, "收集模板更新成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        delete,
+        path = "/api/admin/template/delete/{template_id}",
+        tag = "管理员-模板管理",
+        params(
+            ("template_id" = uuid::Uuid, Path, description = "模板ID")
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "删除收集模板成功",),
+            (status = 404, description = "模板不存在")
+        )
+    )
+)]
+#[tracing::instrument(name = "删除收集模板", skip(app_state))]
+pub async fn delete_template_handler(
+    app_state: web::Data<AppState>,
+    template_id: web::Path<uuid::Uuid>,
+) -> Result<impl Responder, AppError> {
+    delete_template(&app_state.pool, template_id.into_inner()).await?;
+
+    Ok(AppResponse::ok_msg("收集模板删除成功"))
 }

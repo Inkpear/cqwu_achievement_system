@@ -35,14 +35,11 @@ pub enum AppError {
     #[error("数据未发生变化")]
     DataNotChanged,
 
-    #[error("用户不存在")]
-    UserNotFound,
+    #[error("{0}")]
+    DataNotFound(String),
 
     #[error("存在更宽泛的API访问规则: {0}")]
     ApiRuleConflict(Uuid),
-
-    #[error("API访问规则不存在")]
-    ApiRuleNotFound,
 
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
@@ -61,7 +58,7 @@ impl ResponseError for AppError {
             AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
-            AppError::UserNotFound | AppError::ApiRuleNotFound => StatusCode::NOT_FOUND,
+            AppError::DataNotFound(_) => StatusCode::NOT_FOUND,
             AppError::PasswordWrong | AppError::Forbidden(_) | AppError::UserDisabled => {
                 StatusCode::FORBIDDEN
             }
@@ -104,7 +101,38 @@ impl ResponseError for AppError {
 pub struct DatabaseErrorCode;
 
 impl DatabaseErrorCode {
-    pub const USER_ALREADY_EXISTS: &'static str = "23505";
+    /// 唯一约束违反 (Unique Violation)
+    pub const UNIQUE_VIOLATION: &'static str = "23505";
+    
+    /// 外键约束违反 (Foreign Key Violation)
+    pub const FOREIGN_KEY_VIOLATION: &'static str = "23503";
+    
+    /// 非空约束违反 (Not Null Violation)
+    pub const NOT_NULL_VIOLATION: &'static str = "23502";
+    
+    /// 检查约束违反 (Check Violation)
+    pub const CHECK_VIOLATION: &'static str = "23514";
+    
+    /// 排他约束违反 (Exclusion Violation)
+    pub const EXCLUSION_VIOLATION: &'static str = "23P01";
+    
+    /// 数据类型不匹配 (Invalid Text Representation)
+    pub const INVALID_TEXT_REPRESENTATION: &'static str = "22P02";
+    
+    /// 字符串数据右截断 (String Data Right Truncation)
+    pub const STRING_DATA_RIGHT_TRUNCATION: &'static str = "22001";
+    
+    /// 数值溢出 (Numeric Value Out of Range)
+    pub const NUMERIC_VALUE_OUT_OF_RANGE: &'static str = "22003";
+    
+    /// 除零错误 (Division by Zero)
+    pub const DIVISION_BY_ZERO: &'static str = "22012";
+    
+    /// 死锁检测 (Deadlock Detected)
+    pub const DEADLOCK_DETECTED: &'static str = "40P01";
+    
+    /// 序列化失败 (Serialization Failure)
+    pub const SERIALIZATION_FAILURE: &'static str = "40001";
 }
 
 fn error_chain_fmt(

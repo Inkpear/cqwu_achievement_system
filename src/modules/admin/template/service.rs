@@ -2,7 +2,9 @@ use sqlx::PgPool;
 
 use crate::{
     common::{error::AppError, pagination::PageData},
-    modules::admin::template::models::{CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO},
+    modules::admin::template::models::{
+        CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO, UpdateTemplateRequest,
+    },
 };
 
 #[tracing::instrument(name = "插入模板到数据库", skip(pool, req))]
@@ -34,7 +36,7 @@ pub async fn create_template(
         description: req.description,
         schema_def: req.schema.schema_def,
         created_at: row.created_at,
-        created_by: user_id,
+        created_by: Some(user_id),
         updated_at: row.updated_at,
     };
 
@@ -106,4 +108,77 @@ pub async fn query_templates(
     );
 
     Ok(page_data)
+}
+
+#[tracing::instrument(name = "更新数据库中的模板", skip(pool, req))]
+pub async fn update_template(
+    pool: &PgPool,
+    username: &str,
+    req: &UpdateTemplateRequest,
+) -> Result<TemplateDTO, AppError> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE sys_template
+        SET name = COALESCE($1, name),
+            category = COALESCE($2, category),
+            description = COALESCE($3, description),
+            schema_def = COALESCE($4, schema_def),
+            updated_at = NOW()
+        WHERE template_id = $5
+        RETURNING template_id, name, category, description, schema_def, created_by, created_at, updated_at
+        "#,
+        req.name,
+        req.category,
+        req.description,
+        req.schema.as_ref().map(|s| s.schema_def.clone()),
+        req.template_id
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if row.is_none() {
+        tracing::warn!("未找到要更新的模板: {}", req.template_id);
+        return Err(AppError::DataNotFound("模板不存在".into()));
+    }
+
+    let row = row.unwrap();
+
+    tracing::info!("用户 {} 更新了模板 {}", username, req.template_id);
+
+    let dto = TemplateDTO {
+        template_id: row.template_id,
+        name: row.name,
+        category: row.category,
+        description: row.description,
+        schema_def: row.schema_def,
+        created_at: row.created_at,
+        created_by: row.created_by,
+        updated_at: row.updated_at,
+    };
+
+    Ok(dto)
+}
+
+#[tracing::instrument(name = "从数据库中删除模板", skip(pool))]
+pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM sys_template
+        WHERE template_id = $1
+        "#,
+        template_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("未找到要删除的模板: {}", template_id);
+        return Err(AppError::DataNotFound("模板不存在".into()));
+    }
+
+    tracing::info!("模板已删除: {}", template_id);
+
+    Ok(())
 }

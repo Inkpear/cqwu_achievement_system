@@ -77,7 +77,7 @@ pub struct TemplateDTO {
     pub schema_def: Value,
 
     pub created_at: DateTime<Utc>,
-    pub created_by: uuid::Uuid,
+    pub created_by: Option<uuid::Uuid>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -96,4 +96,22 @@ impl QueryTemplatesRequest {
     pub fn offset(&self) -> i64 {
         (self.page - 1) * self.page_size
     }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+pub struct UpdateTemplateRequest {
+    pub template_id: uuid::Uuid,
+
+    #[validate(length(min = 1, max = 100, message = "模板名称长度应在1到100个字符之间"))]
+    pub name: Option<String>,
+
+    #[validate(length(min = 1, max = 50, message = "模板类别长度应在1到50个字符之间"))]
+    pub category: Option<String>,
+
+    #[validate(length(min = 1, message = "模板描述不能为空"))]
+    pub description: Option<String>,
+
+    #[validate(custom(function = "validate_template_schema"))]
+    pub schema: Option<TemplateSchema>,
 }

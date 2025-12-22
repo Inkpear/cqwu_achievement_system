@@ -237,6 +237,26 @@ impl TestApp {
 
         request.send().await.expect("Failed to execute request")
     }
+
+    pub async fn patch_update_template(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/template/update", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_template(&self, template_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/template/delete/{}",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

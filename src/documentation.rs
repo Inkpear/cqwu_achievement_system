@@ -24,7 +24,9 @@ use utoipa::{
         crate::modules::admin::user::routes::query_users_handler,
         crate::modules::admin::user::routes::admin_change_user_password_handler,
         crate::modules::admin::template::routes::create_template_handler,
-        crate::modules::admin::template::routes::query_templates_handler
+        crate::modules::admin::template::routes::query_templates_handler,
+        crate::modules::admin::template::routes::update_template_handler,
+        crate::modules::admin::template::routes::delete_template_handler
     ),
     components(
         schemas(

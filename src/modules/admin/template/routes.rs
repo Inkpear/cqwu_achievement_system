@@ -62,6 +62,9 @@ pub async fn create_template_handler(
             ("page" = i64, Query, description = "页码，默认为1"),
             ("page_size" = i64, Query, description = "每页条数，默认为10")
         ),
+        security(
+            ("bearer_auth" = [])
+        ),
         responses(
             (status = 200, description = "查询收集模板成功", body = AppResponse<PageData<TemplateDTO>>),
             (status = 400, description = "参数校验失败")

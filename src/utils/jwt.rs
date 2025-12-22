@@ -4,7 +4,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::middleware::auth::UserRole;
+use crate::domain::UserRole;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Claims {

@@ -15,28 +15,14 @@ use sqlx::PgPool;
 
 use crate::{
     common::{app_state::AppState, error::AppError},
+    domain::UserRole,
     utils::jwt::{Claims, JwtConfig},
 };
 
+const BASIC_PERMISSIONS: [(&str, &str); 1] = [("/api/user/", "ALL")];
+
 #[derive(Clone)]
 pub struct AuthenticatedUser(Claims);
-
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub enum UserRole {
-    #[serde(rename = "ADMIN")]
-    Admin,
-    #[serde(rename = "USER")]
-    User,
-}
-
-impl From<String> for UserRole {
-    fn from(s: String) -> Self {
-        match s.to_ascii_uppercase().as_str() {
-            "ADMIN" => UserRole::Admin,
-            _ => UserRole::User,
-        }
-    }
-}
 
 impl FromRequest for AuthenticatedUser {
     type Error = AppError;
@@ -87,7 +73,7 @@ pub async fn mw_authentication(
     tracing::Span::current().record("username", &tracing::field::display(&claims.username));
 
     check_user_enabled(&app_state.pool, &claims).await?;
-    if let UserRole::User = claims.role {
+    if let UserRole::USER = claims.role {
         check_user_role(
             claims.sub,
             req.path(),
@@ -153,17 +139,15 @@ fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
         })?)
 }
 
-const BASIC_PERMISSIONS: &[(&str, &str)] = &[("/api/user/", "ALL")];
-
 #[tracing::instrument(name = "检查用户权限", skip(pool))]
-pub async fn check_user_role(
+async fn check_user_role(
     user_id: uuid::Uuid,
     api_path: &str,
     http_method: &str,
     pool: &PgPool,
 ) -> Result<(), AppError> {
     for (pattern, method) in BASIC_PERMISSIONS {
-        if api_path.starts_with(pattern) && (*method == "ALL" || *method == http_method) {
+        if api_path.starts_with(pattern) && (method == "ALL" || method == http_method) {
             return Ok(());
         }
     }
@@ -193,7 +177,7 @@ pub async fn check_user_role(
 
     if !row.has_permission {
         tracing::warn!("用户 {} 无权访问 {} {}", user_id, http_method, api_path);
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("用户权限不足".into()));
     }
 
     Ok(())

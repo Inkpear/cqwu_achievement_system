@@ -1,12 +1,15 @@
+use std::collections::HashMap;
+
 use actix_web::{HttpResponse, ResponseError, body::BoxBody, http::StatusCode};
 use uuid::Uuid;
+use validator::ValidationErrors;
 
 use crate::common::response::AppResponse;
 
 #[derive(thiserror::Error)]
 pub enum AppError {
-    #[error("参数校验失败: {0}")]
-    ValidationError(String),
+    #[error("参数校验失败")]
+    ValidationError(ValidationErrors),
 
     #[error("用户已经存在，请勿重复注册")]
     UserAlreadyExists,
@@ -26,20 +29,17 @@ pub enum AppError {
     #[error("账户已被禁用，请联系管理员")]
     UserDisabled,
 
-    #[error("用户权限不足")]
-    Forbidden,
+    #[error("{0}")]
+    Forbidden(String),
 
     #[error("数据未发生变化")]
     DataNotChanged,
 
-    #[error("用户不存在")]
-    UserNotFound,
+    #[error("{0}")]
+    DataNotFound(String),
 
     #[error("存在更宽泛的API访问规则: {0}")]
     ApiRuleConflict(Uuid),
-
-    #[error("API访问规则不存在")]
-    ApiRuleNotFound,
 
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
@@ -58,8 +58,8 @@ impl ResponseError for AppError {
             AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
-            AppError::UserNotFound | AppError::ApiRuleNotFound => StatusCode::NOT_FOUND,
-            AppError::PasswordWrong | AppError::Forbidden | AppError::UserDisabled => {
+            AppError::DataNotFound(_) => StatusCode::NOT_FOUND,
+            AppError::PasswordWrong | AppError::Forbidden(_) | AppError::UserDisabled => {
                 StatusCode::FORBIDDEN
             }
             AppError::LoginFailed | AppError::Unauthorized | AppError::JwtExpired => {
@@ -70,14 +70,29 @@ impl ResponseError for AppError {
 
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let status_code = self.status_code();
-        let message = match status_code {
-            StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),
-            _ => self.to_string(),
+
+        let response = match self {
+            AppError::ValidationError(errors) => {
+                let field_errors = parse_validation_errors(errors);
+
+                AppResponse::builder()
+                    .code(status_code.clone())
+                    .message("参数校验失败")
+                    .data(serde_json::json!({ "errors": field_errors }))
+                    .build()
+            }
+            _ => {
+                let message = match status_code {
+                    StatusCode::INTERNAL_SERVER_ERROR => "系统内部错误，请稍后再试".to_string(),
+                    _ => self.to_string(),
+                };
+                AppResponse::builder()
+                    .code(status_code.clone())
+                    .message(&message)
+                    .data(serde_json::json!({}))
+                    .build()
+            }
         };
-        let response = AppResponse::empty()
-            .code(status_code.clone())
-            .message(&message)
-            .build();
 
         HttpResponse::build(status_code).json(response)
     }
@@ -86,7 +101,38 @@ impl ResponseError for AppError {
 pub struct DatabaseErrorCode;
 
 impl DatabaseErrorCode {
-    pub const USER_ALREADY_EXISTS: &'static str = "23505";
+    /// 唯一约束违反 (Unique Violation)
+    pub const UNIQUE_VIOLATION: &'static str = "23505";
+    
+    /// 外键约束违反 (Foreign Key Violation)
+    pub const FOREIGN_KEY_VIOLATION: &'static str = "23503";
+    
+    /// 非空约束违反 (Not Null Violation)
+    pub const NOT_NULL_VIOLATION: &'static str = "23502";
+    
+    /// 检查约束违反 (Check Violation)
+    pub const CHECK_VIOLATION: &'static str = "23514";
+    
+    /// 排他约束违反 (Exclusion Violation)
+    pub const EXCLUSION_VIOLATION: &'static str = "23P01";
+    
+    /// 数据类型不匹配 (Invalid Text Representation)
+    pub const INVALID_TEXT_REPRESENTATION: &'static str = "22P02";
+    
+    /// 字符串数据右截断 (String Data Right Truncation)
+    pub const STRING_DATA_RIGHT_TRUNCATION: &'static str = "22001";
+    
+    /// 数值溢出 (Numeric Value Out of Range)
+    pub const NUMERIC_VALUE_OUT_OF_RANGE: &'static str = "22003";
+    
+    /// 除零错误 (Division by Zero)
+    pub const DIVISION_BY_ZERO: &'static str = "22012";
+    
+    /// 死锁检测 (Deadlock Detected)
+    pub const DEADLOCK_DETECTED: &'static str = "40P01";
+    
+    /// 序列化失败 (Serialization Failure)
+    pub const SERIALIZATION_FAILURE: &'static str = "40001";
 }
 
 fn error_chain_fmt(
@@ -100,4 +146,18 @@ fn error_chain_fmt(
         current = cause.source();
     }
     Ok(())
+}
+
+fn parse_validation_errors(errors: &ValidationErrors) -> HashMap<String, Vec<String>> {
+    let mut field_errors: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (field, errors) in errors.field_errors().iter() {
+        let messages: Vec<String> = errors
+            .iter()
+            .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+            .collect();
+        field_errors.insert(field.to_string(), messages);
+    }
+
+    field_errors
 }

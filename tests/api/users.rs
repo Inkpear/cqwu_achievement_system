@@ -13,7 +13,7 @@ async fn change_password_is_rejected_when_old_password_is_wrong() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await
@@ -35,7 +35,7 @@ async fn change_password_success() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await
@@ -68,7 +68,7 @@ async fn try_to_change_password_failed_when_not_logged_in() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await
@@ -103,7 +103,7 @@ async fn when_user_is_disabled_request_is_rejected() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await
@@ -126,7 +126,7 @@ pub async fn normal_user_has_basic_role_to_change_password() {
     });
 
     let response = app
-        .put_change_password(&body)
+        .patch_change_password(&body)
         .await
         .json::<serde_json::Value>()
         .await

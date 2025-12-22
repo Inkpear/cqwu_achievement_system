@@ -86,17 +86,11 @@ async fn login_is_rejected_with_missing_credentials() {
     }
 
     let test_cases = vec![
-        (
-            serde_json::json!({"username": "123", "password": ""}),
-            "密码不能为空".into(),
-        ),
-        (
-            serde_json::json!({"password": "123", "username": ""}),
-            "用户名不能为空".into(),
-        ),
+        serde_json::json!({"username": "123", "password": ""}),
+        serde_json::json!({"password": "123", "username": ""}),
     ];
 
-    for (body, expected_message) in test_cases {
+    for body in test_cases {
         let response = app
             .post_login(&body)
             .await
@@ -104,6 +98,6 @@ async fn login_is_rejected_with_missing_credentials() {
             .await
             .expect("Failed to parse JSON response");
 
-        check_response_code_and_message(&response, 400, expected_message);
+        check_response_code_and_message(&response, 400, "参数校验失败");
     }
 }

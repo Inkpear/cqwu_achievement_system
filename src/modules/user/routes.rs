@@ -12,13 +12,10 @@ use crate::{
     },
 };
 
-#[cfg(feature = "swagger")]
-use crate::common::response::EmptyData;
-
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
-        put,
+        patch,
         path = "/api/user/password",
         tag = "用户管理",
         security(
@@ -26,7 +23,7 @@ use crate::common::response::EmptyData;
         ),
         request_body = ChangePasswordRequest,
         responses(
-            (status = 200, description = "修改密码成功", body = AppResponse<EmptyData>),
+            (status = 200, description = "修改密码成功"),
             (status = 400, description = "参数校验失败"),
             (status = 403, description = "密码错误，请检查您的输入是否正确")
         )
@@ -45,8 +42,8 @@ pub async fn change_password_handler(
     req: web::Json<ChangePasswordRequest>,
     claims: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
-    let change_password_body = ChangePassword::try_from_request(req.0)
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+    let change_password_body =
+        ChangePassword::try_from_request(req.0).map_err(AppError::ValidationError)?;
 
     validate_user_password(
         &claims.username,

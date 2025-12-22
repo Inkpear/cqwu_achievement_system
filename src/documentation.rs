@@ -1,6 +1,9 @@
 use crate::common::pagination::PageData;
-use crate::common::response::{AppResponse, EmptyData};
-use crate::modules::admin::models::*;
+use crate::common::response::AppResponse;
+use crate::domain::{HttpMethod, UserRole};
+use crate::modules::admin::api_rule::models::*;
+use crate::modules::admin::template::models::*;
+use crate::modules::admin::user::models::*;
 use crate::modules::auth::models::*;
 use crate::modules::user::models::*;
 use utoipa::{
@@ -11,41 +14,57 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        crate::modules::admin::routes::create_user_handler,
+        crate::modules::admin::user::routes::create_user_handler,
         crate::modules::auth::routes::login_user_handler,
         crate::modules::user::routes::change_password_handler,
-        crate::modules::admin::routes::modify_user_status_handler,
-        crate::modules::admin::routes::grant_user_api_rule_handler,
-        crate::modules::admin::routes::revoke_user_api_rule_handler,
-        crate::modules::admin::routes::query_user_api_access_rules_handler
+        crate::modules::admin::user::routes::modify_user_status_handler,
+        crate::modules::admin::api_rule::routes::grant_user_api_rule_handler,
+        crate::modules::admin::api_rule::routes::revoke_user_api_rule_handler,
+        crate::modules::admin::api_rule::routes::query_user_api_access_rules_handler,
+        crate::modules::admin::user::routes::query_users_handler,
+        crate::modules::admin::user::routes::admin_change_user_password_handler,
+        crate::modules::admin::template::routes::create_template_handler,
+        crate::modules::admin::template::routes::query_templates_handler,
+        crate::modules::admin::template::routes::update_template_handler,
+        crate::modules::admin::template::routes::delete_template_handler
     ),
     components(
         schemas(
             RegisterUserRequest,
-            UserResponse,
+            UserDTO,
             LoginRequest,
             LoginResponse,
             ChangePasswordRequest,
+            ChangeUserPasswordRequest,
             ModifyUserStatusRequest,
             GrantUserApiRuleRequest,
             GrantUserApiRuleResponse,
             QueryUserApiRuleRequest,
+            QueryUserRequest,
             ApiRuleDTO,
             HttpMethod,
-            AppResponse<UserResponse>,
+            AppResponse<UserDTO>,
             AppResponse<LoginResponse>,
             AppResponse<GrantUserApiRuleResponse>,
             AppResponse<PageData<ApiRuleDTO>>,
-            AppResponse<EmptyData>,
+            AppResponse<PageData<UserDTO>>,
             PageData<ApiRuleDTO>,
-            EmptyData
+            UserRole,
+            CreateTemplateRequest,
+            TemplateSchema,
+            TemplateDTO,
+            AppResponse<TemplateDTO>,
+            AppResponse<PageData<TemplateDTO>>,
+            PageData<TemplateDTO>
         )
     ),
     modifiers(&SecurityAddon),
     tags(
         (name = "用户管理", description = "基础用户接口"),
         (name = "用户认证", description = "包含登陆接口"),
-        (name = "管理员操作", description = "管理员接口, 默认需要管理员账户")
+        (name = "管理员-模板管理", description = "收集模板管理接口, 需要管理员权限"),
+        (name = "管理员-用户管理", description = "用户管理相关接口, 需要管理员权限"),
+        (name = "管理员-API 访问规则管理", description = "API 访问规则管理相关接口, 需要管理员权限")
     ),
     info(
         title = "高校成果收集系统 API",

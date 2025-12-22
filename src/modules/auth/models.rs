@@ -9,11 +9,11 @@ use validator::{Validate, ValidationErrors};
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct LoginRequest {
     #[validate(length(min = 1, message = "用户名不能为空"))]
-    #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
+    #[cfg_attr(feature = "swagger", schema(example = "admin"))]
     pub username: String,
 
     #[validate(length(min = 1, message = "密码不能为空"))]
-    #[cfg_attr(feature = "swagger", schema(example = "password"))]
+    #[cfg_attr(feature = "swagger", schema(example = "admin123"))]
     pub password: String,
 }
 

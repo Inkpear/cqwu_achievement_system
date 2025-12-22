@@ -1,4 +1,3 @@
-use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -7,73 +6,17 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         pagination::PageData,
     },
-    modules::{
-        admin::models::{
-            ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest, RegisterUser,
-        },
-        user::service::check_user_exists,
+    modules::admin::api_rule::models::{
+        ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest,
     },
 };
 
-#[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
-pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<Uuid, AppError> {
-    let result = sqlx::query!(
-        r#"
-            INSERT INTO sys_user (username, nickname, password_hash)
-            VALUES($1, $2, $3)
-            RETURNING user_id
-        "#,
-        user.username,
-        user.nickname,
-        user.password.expose_secret()
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
-        if let Some(db_error) = e.as_database_error() {
-            if Some(DatabaseErrorCode::USER_ALREADY_EXISTS).eq(&db_error.code().as_deref()) {
-                return AppError::UserAlreadyExists;
-            }
-        }
-        AppError::UnexpectedError(e.into())
-    })?;
-
-    Ok(result.user_id)
-}
-
-#[tracing::instrument(name = "修改用户状态", skip(pool))]
-pub async fn modify_user_status(
-    pool: &PgPool,
-    user_id: &Uuid,
-    is_active: bool,
-) -> Result<(), AppError> {
-    check_user_exists(pool, user_id).await?;
-
-    sqlx::query!(
-        r#"
-        UPDATE sys_user
-        SET is_active = $1
-        WHERE user_id = $2
-        "#,
-        is_active,
-        user_id
-    )
-    .execute(pool)
-    .await
-    .map_err(|e| AppError::UnexpectedError(e.into()))?;
-
-    tracing::info!("用户 {} 状态已修改为 {}", user_id, is_active);
-
-    Ok(())
-}
-
-#[tracing::instrument(name = "授予用户 API 访问规则", skip(pool, req))]
+#[tracing::instrument(name = "创建用户 API 访问规则到数据库", skip(pool, req))]
 pub async fn grant_user_api_access_rule(
     pool: &PgPool,
     req: &GrantUserApiRuleRequest,
     granted_by: &Uuid,
 ) -> Result<Uuid, AppError> {
-    check_user_exists(pool, &req.user_id).await?;
     check_api_rule_conflict(pool, req).await?;
 
     let row = sqlx::query!(
@@ -93,7 +36,14 @@ pub async fn grant_user_api_access_rule(
     )
     .fetch_one(pool)
     .await
-    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    .map_err(|e| {
+        if let Some(db_error) = e.as_database_error() {
+            if Some(DatabaseErrorCode::FOREIGN_KEY_VIOLATION).eq(&db_error.code().as_deref()) {
+                return AppError::DataNotFound("用户不存在".into());
+            }
+        }
+        AppError::UnexpectedError(e.into())
+    })?;
 
     Ok(row.rule_id)
 }
@@ -135,7 +85,7 @@ pub async fn check_api_rule_conflict(
     Ok(())
 }
 
-#[tracing::instrument(name = "撤销用户 API 访问规则", skip(pool))]
+#[tracing::instrument(name = "从数据库撤销用户 API 访问规则", skip(pool))]
 pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Result<(), AppError> {
     let row = sqlx::query!(
         r#"
@@ -150,7 +100,7 @@ pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Resul
 
     if row.rows_affected() == 0 {
         tracing::warn!("未找到要撤销的规则: {}", rule_id);
-        return Err(AppError::ApiRuleNotFound);
+        return Err(AppError::DataNotFound("API访问规则不存在".into()));
     }
 
     tracing::info!("API 访问规则已撤销: {}", rule_id);
@@ -158,7 +108,7 @@ pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Resul
     Ok(())
 }
 
-#[tracing::instrument(name = "查询用户 API 访问规则", skip(pool, req))]
+#[tracing::instrument(name = "从数据库查询用户 API 访问规则", skip(pool, req))]
 pub async fn query_user_api_access_rules(
     pool: &PgPool,
     req: &QueryUserApiRuleRequest,

@@ -6,7 +6,7 @@ use argon2::{
 };
 use cqwu_achievement_system::{
     configuration::{DatabaseSettings, get_configuration},
-    middleware::auth::UserRole,
+    domain::UserRole,
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
 };
@@ -124,12 +124,12 @@ impl TestApp {
             .expect("Failed to build client with headers");
     }
 
-    pub async fn put_change_password<Body: serde::Serialize>(
+    pub async fn patch_change_password<Body: serde::Serialize>(
         &self,
         body: &Body,
     ) -> reqwest::Response {
         self.api_client
-            .put(&format!("{}/api/user/password", self.address))
+            .patch(&format!("{}/api/user/password", self.address))
             .json(body)
             .send()
             .await
@@ -183,6 +183,80 @@ impl TestApp {
 
         request.send().await.expect("Failed to execute request")
     }
+
+    pub async fn get_query_user(&self, user_id: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/admin/user/query", self.address))
+            .query(user_id)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_change_user_password(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/user/password", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_create_template(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/admin/template/create", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_query_templates(
+        &self,
+        template_id: Option<&str>,
+        name: Option<&str>,
+        category: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> reqwest::Response {
+        let mut request = self
+            .api_client
+            .get(&format!("{}/api/admin/template/query", self.address));
+
+        if let Some(id) = template_id {
+            request = request.query(&[("template_id", id)]);
+        }
+        if let Some(n) = name {
+            request = request.query(&[("name", n)]);
+        }
+        if let Some(c) = category {
+            request = request.query(&[("category", c)]);
+        }
+        request = request.query(&[("page", &page.to_string())]);
+        request = request.query(&[("page_size", &page_size.to_string())]);
+
+        request.send().await.expect("Failed to execute request")
+    }
+
+    pub async fn patch_update_template(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/admin/template/update", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_template(&self, template_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/template/delete/{}",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {
@@ -200,7 +274,7 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
-            role: UserRole::User,
+            role: UserRole::USER,
         }
     }
 
@@ -215,7 +289,7 @@ impl TestUser {
             username: "admin".to_string(),
             nickname: "系统管理员".to_string(),
             password: "admin123".to_string(),
-            role: UserRole::Admin,
+            role: UserRole::ADMIN,
         }
     }
 
@@ -225,7 +299,7 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             nickname: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
-            role: UserRole::Admin,
+            role: UserRole::ADMIN,
         }
     }
 

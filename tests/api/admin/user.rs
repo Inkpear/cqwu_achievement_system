@@ -249,7 +249,9 @@ async fn create_user_and_filter_user_query_success() {
     check_response_code_and_message(&response, 200, "查询用户成功");
 
     let data = &response["data"];
-    let users = data["items"].as_array().expect("Data items is not an array");
+    let users = data["items"]
+        .as_array()
+        .expect("Data items is not an array");
     assert_eq!(users.len(), 12);
     assert_eq!(data["total"].as_i64().unwrap(), 21);
     assert_eq!(data["total_pages"].as_i64().unwrap(), 2);

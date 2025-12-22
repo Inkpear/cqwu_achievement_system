@@ -315,9 +315,10 @@ async fn query_templates_by_name() {
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
     assert!(list.len() >= 1);
-    assert!(list
-        .iter()
-        .any(|item| item["name"].as_str().unwrap().contains("特殊查询")));
+    assert!(
+        list.iter()
+            .any(|item| item["name"].as_str().unwrap().contains("特殊查询"))
+    );
 }
 
 #[tokio::test]

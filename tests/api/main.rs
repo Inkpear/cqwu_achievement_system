@@ -4,4 +4,3 @@ mod admin;
 mod auth;
 mod health_check;
 mod users;
-mod template;

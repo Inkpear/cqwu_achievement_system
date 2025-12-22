@@ -45,8 +45,8 @@ pub async fn change_password_handler(
     req: web::Json<ChangePasswordRequest>,
     claims: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
-    let change_password_body = ChangePassword::try_from_request(req.0)
-        .map_err(AppError::ValidationError)?;
+    let change_password_body =
+        ChangePassword::try_from_request(req.0).map_err(AppError::ValidationError)?;
 
     validate_user_password(
         &claims.username,

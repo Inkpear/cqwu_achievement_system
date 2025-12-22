@@ -1,9 +1,11 @@
 use crate::common::pagination::PageData;
 use crate::common::response::{AppResponse, EmptyData};
-use crate::modules::admin::models::*;
+use crate::domain::{HttpMethod, UserRole};
+use crate::modules::admin::api_rule::models::*;
+use crate::modules::admin::template::models::*;
+use crate::modules::admin::user::models::*;
 use crate::modules::auth::models::*;
 use crate::modules::user::models::*;
-use crate::modules::template::models::*;
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -12,22 +14,22 @@ use utoipa::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        crate::modules::admin::routes::create_user_handler,
+        crate::modules::admin::user::routes::create_user_handler,
         crate::modules::auth::routes::login_user_handler,
         crate::modules::user::routes::change_password_handler,
-        crate::modules::admin::routes::modify_user_status_handler,
-        crate::modules::admin::routes::grant_user_api_rule_handler,
-        crate::modules::admin::routes::revoke_user_api_rule_handler,
-        crate::modules::admin::routes::query_user_api_access_rules_handler,
-        crate::modules::admin::routes::query_user_list_handler,
-        crate::modules::admin::routes::admin_change_user_password_handler,
-        crate::modules::template::routes::create_template_handler,
-        crate::modules::template::routes::query_templates_handler
+        crate::modules::admin::user::routes::modify_user_status_handler,
+        crate::modules::admin::api_rule::routes::grant_user_api_rule_handler,
+        crate::modules::admin::api_rule::routes::revoke_user_api_rule_handler,
+        crate::modules::admin::api_rule::routes::query_user_api_access_rules_handler,
+        crate::modules::admin::user::routes::query_users_handler,
+        crate::modules::admin::user::routes::admin_change_user_password_handler,
+        crate::modules::admin::template::routes::create_template_handler,
+        crate::modules::admin::template::routes::query_templates_handler
     ),
     components(
         schemas(
             RegisterUserRequest,
-            UserResponse,
+            UserDTO,
             LoginRequest,
             LoginResponse,
             ChangePasswordRequest,
@@ -39,7 +41,7 @@ use utoipa::{
             QueryUserRequest,
             ApiRuleDTO,
             HttpMethod,
-            AppResponse<UserResponse>,
+            AppResponse<UserDTO>,
             AppResponse<LoginResponse>,
             AppResponse<GrantUserApiRuleResponse>,
             AppResponse<PageData<ApiRuleDTO>>,

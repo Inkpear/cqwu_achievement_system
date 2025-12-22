@@ -14,7 +14,9 @@ use jsonwebtoken::errors::ErrorKind;
 use sqlx::PgPool;
 
 use crate::{
-    common::{app_state::AppState, error::AppError}, modules::admin::models::UserRole, utils::jwt::{Claims, JwtConfig}
+    common::{app_state::AppState, error::AppError},
+    domain::UserRole,
+    utils::jwt::{Claims, JwtConfig},
 };
 
 #[derive(Clone)]

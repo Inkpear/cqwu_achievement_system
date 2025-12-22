@@ -5,7 +5,10 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use cqwu_achievement_system::{
-    configuration::{DatabaseSettings, get_configuration}, modules::admin::models::UserRole, telemetry::{get_subscriber, init_subscriber}, utils::jwt::JwtConfig
+    configuration::{DatabaseSettings, get_configuration},
+    domain::UserRole,
+    telemetry::{get_subscriber, init_subscriber},
+    utils::jwt::JwtConfig,
 };
 use reqwest::header::HeaderMap;
 
@@ -201,7 +204,7 @@ impl TestApp {
 
     pub async fn post_create_template(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/template/create", self.address))
+            .post(&format!("{}/api/admin/template/create", self.address))
             .json(body)
             .send()
             .await
@@ -218,7 +221,7 @@ impl TestApp {
     ) -> reqwest::Response {
         let mut request = self
             .api_client
-            .get(&format!("{}/api/template/query", self.address));
+            .get(&format!("{}/api/admin/template/query", self.address));
 
         if let Some(id) = template_id {
             request = request.query(&[("template_id", id)]);

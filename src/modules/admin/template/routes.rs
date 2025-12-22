@@ -4,17 +4,14 @@ use validator::Validate;
 use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
-    modules::template::{
+    modules::admin::template::{
         models::{CreateTemplateRequest, QueryTemplatesRequest},
         service::{create_template, query_templates},
     },
 };
 
 #[cfg(feature = "swagger")]
-use crate::{
-    common::pagination::PageData,
-    modules::template::models::TemplateDTO,
-};
+use crate::{common::pagination::PageData, modules::admin::template::models::TemplateDTO};
 
 #[cfg_attr(
     feature = "swagger",

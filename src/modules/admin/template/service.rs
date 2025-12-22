@@ -2,7 +2,7 @@ use sqlx::PgPool;
 
 use crate::{
     common::{error::AppError, pagination::PageData},
-    modules::template::models::{CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO},
+    modules::admin::template::models::{CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO},
 };
 
 #[tracing::instrument(name = "插入模板到数据库", skip(pool, req))]

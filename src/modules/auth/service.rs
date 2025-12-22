@@ -4,7 +4,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    common::error::AppError, modules::admin::models::UserRole, utils::{jwt::JwtConfig, password::verify_password}
+    common::error::AppError,
+    domain::UserRole,
+    utils::{jwt::JwtConfig, password::verify_password},
 };
 
 #[tracing::instrument(name = "从数据库中获取用户凭据", skip(pool))]

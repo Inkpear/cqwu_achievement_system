@@ -12,9 +12,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "swagger")]
-use crate::common::response::EmptyData;
-
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
@@ -26,7 +23,7 @@ use crate::common::response::EmptyData;
         ),
         request_body = ChangePasswordRequest,
         responses(
-            (status = 200, description = "修改密码成功", body = AppResponse<EmptyData>),
+            (status = 200, description = "修改密码成功"),
             (status = 400, description = "参数校验失败"),
             (status = 403, description = "密码错误，请检查您的输入是否正确")
         )

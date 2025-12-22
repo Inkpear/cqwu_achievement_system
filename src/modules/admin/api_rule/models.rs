@@ -25,7 +25,6 @@ pub struct GrantUserApiRuleRequest {
     ))]
     pub api_pattern: String,
 
-
     #[validate(custom(function = "validate_expires_at"))]
     pub expires_at: Option<DateTime<Utc>>,
 

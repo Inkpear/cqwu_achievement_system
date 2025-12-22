@@ -1,5 +1,5 @@
 use crate::common::pagination::PageData;
-use crate::common::response::{AppResponse, EmptyData};
+use crate::common::response::AppResponse;
 use crate::domain::{HttpMethod, UserRole};
 use crate::modules::admin::api_rule::models::*;
 use crate::modules::admin::template::models::*;
@@ -45,10 +45,8 @@ use utoipa::{
             AppResponse<LoginResponse>,
             AppResponse<GrantUserApiRuleResponse>,
             AppResponse<PageData<ApiRuleDTO>>,
-            AppResponse<EmptyData>,
             AppResponse<PageData<UserDTO>>,
             PageData<ApiRuleDTO>,
-            EmptyData,
             UserRole,
             CreateTemplateRequest,
             TemplateSchema,

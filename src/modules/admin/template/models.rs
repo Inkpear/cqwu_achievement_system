@@ -75,7 +75,7 @@ pub struct TemplateDTO {
 
     #[cfg_attr(feature = "swagger", schema(example = "json_schema"))]
     pub schema_def: Value,
-    
+
     pub created_at: DateTime<Utc>,
     pub created_by: uuid::Uuid,
     pub updated_at: DateTime<Utc>,

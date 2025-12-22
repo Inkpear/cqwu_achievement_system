@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[cfg(feature = "swagger")]
-use crate::common::{pagination::PageData, response::EmptyData};
+use crate::common::pagination::PageData;
 
 #[cfg_attr(
     feature = "swagger",
@@ -75,7 +75,7 @@ pub async fn grant_user_api_rule_handler(
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 200, description = "撤销用户 API 访问规则成功", body = AppResponse<EmptyData>),
+            (status = 200, description = "撤销用户 API 访问规则成功"),
             (status = 404, description = "API访问规则不存在"),
         )
     )

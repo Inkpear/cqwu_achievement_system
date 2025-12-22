@@ -16,9 +16,7 @@ use crate::{
 
 #[cfg(feature = "swagger")]
 use crate::{
-    common::{pagination::PageData, response::EmptyData},
-    domain::UserRole,
-    modules::admin::user::models::UserDTO,
+    common::pagination::PageData, domain::UserRole, modules::admin::user::models::UserDTO,
 };
 
 #[cfg_attr(
@@ -75,9 +73,10 @@ pub async fn create_user_handler(
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 200, description = "修改用户状态成功", body = AppResponse<EmptyData>),
+            (status = 200, description = "修改用户状态成功"),
             (status = 400, description = "参数校验失败"),
             (status = 404, description = "用户不存在"),
+            (status = 403, description = "不能修改自己的用户状态"),
         )
     )
 )]
@@ -161,7 +160,7 @@ pub async fn query_users_handler(
             ("bearer_auth" = [])
         ),
         responses(
-            (status = 200, description = "修改用户密码成功", body = AppResponse<EmptyData>),
+            (status = 200, description = "修改用户密码成功"),
             (status = 400, description = "参数校验失败"),
             (status = 404, description = "用户不存在"),
         )

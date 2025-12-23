@@ -41,6 +41,9 @@ pub enum AppError {
     #[error("存在更宽泛的API访问规则: {0}")]
     ApiRuleConflict(Uuid),
 
+    #[error("构造JSON Schema 查询失败")]
+    BuildSchemaQueryFailed,
+
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -54,7 +57,7 @@ impl std::fmt::Debug for AppError {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            AppError::ValidationError(_) | AppError::BuildSchemaQueryFailed => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
@@ -103,36 +106,39 @@ pub struct DatabaseErrorCode;
 impl DatabaseErrorCode {
     /// 唯一约束违反 (Unique Violation)
     pub const UNIQUE_VIOLATION: &'static str = "23505";
-    
+
     /// 外键约束违反 (Foreign Key Violation)
     pub const FOREIGN_KEY_VIOLATION: &'static str = "23503";
-    
+
     /// 非空约束违反 (Not Null Violation)
     pub const NOT_NULL_VIOLATION: &'static str = "23502";
-    
+
     /// 检查约束违反 (Check Violation)
     pub const CHECK_VIOLATION: &'static str = "23514";
-    
+
     /// 排他约束违反 (Exclusion Violation)
     pub const EXCLUSION_VIOLATION: &'static str = "23P01";
-    
+
     /// 数据类型不匹配 (Invalid Text Representation)
     pub const INVALID_TEXT_REPRESENTATION: &'static str = "22P02";
-    
+
     /// 字符串数据右截断 (String Data Right Truncation)
     pub const STRING_DATA_RIGHT_TRUNCATION: &'static str = "22001";
-    
+
     /// 数值溢出 (Numeric Value Out of Range)
     pub const NUMERIC_VALUE_OUT_OF_RANGE: &'static str = "22003";
-    
+
     /// 除零错误 (Division by Zero)
     pub const DIVISION_BY_ZERO: &'static str = "22012";
-    
+
     /// 死锁检测 (Deadlock Detected)
     pub const DEADLOCK_DETECTED: &'static str = "40P01";
-    
+
     /// 序列化失败 (Serialization Failure)
     pub const SERIALIZATION_FAILURE: &'static str = "40001";
+
+    /// 语法错误 (Syntax Error)
+    pub const SYNTAX_ERROR: &'static str = "42601";
 }
 
 fn error_chain_fmt(

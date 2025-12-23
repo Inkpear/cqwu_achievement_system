@@ -272,6 +272,38 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn post_create_archive_record(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/create",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_query_archive_records(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/query",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

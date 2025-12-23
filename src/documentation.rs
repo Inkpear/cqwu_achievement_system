@@ -6,6 +6,8 @@ use crate::modules::admin::template::models::*;
 use crate::modules::admin::user::models::*;
 use crate::modules::auth::models::*;
 use crate::modules::user::models::*;
+use crate::modules::archive::models::*;
+
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -28,6 +30,8 @@ use utoipa::{
         crate::modules::admin::template::routes::update_template_handler,
         crate::modules::admin::template::routes::delete_template_handler,
         crate::modules::admin::template::routes::modify_template_status_handler,
+        crate::modules::archive::routes::create_archive_record_handler,
+        crate::modules::archive::routes::query_archive_records_handler,
     ),
     components(
         schemas(
@@ -56,6 +60,11 @@ use utoipa::{
             AppResponse<PageData<TemplateDTO>>,
             PageData<TemplateDTO>,
             ModifyTemplateStatusRequest,
+            CreateArchiveRecordRequest,
+            ArchiveRecordDTO,
+            QueryArchiveRecordsRequest,
+            AppResponse<ArchiveRecordDTO>,
+            AppResponse<PageData<ArchiveRecordDTO>>,
         )
     ),
     modifiers(&SecurityAddon),

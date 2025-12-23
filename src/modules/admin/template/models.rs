@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::common::pagination::{default_page, default_page_size};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -22,41 +24,8 @@ pub struct CreateTemplateRequest {
     #[cfg_attr(feature = "swagger", schema(example = "用于收集用户基本信息的模板"))]
     pub description: Option<String>,
 
-    #[validate(custom(function = "validate_template_schema"))]
+    #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: TemplateSchema,
-}
-
-#[derive(Deserialize, Serialize)]
-#[cfg_attr(feature = "swagger", derive(ToSchema))]
-pub struct TemplateSchema {
-    pub schema_def: Value,
-    pub instance: Option<Value>,
-}
-
-fn validate_template_schema(schema: &TemplateSchema) -> Result<(), ValidationError> {
-    let validator = jsonschema::validator_for(&schema.schema_def).map_err(|e| {
-        let mut error = ValidationError::new("invalid_json_schema");
-        error.message = Some(format!("无效的JSON Schema: {}", e).into());
-        error
-    })?;
-
-    if let Some(instance) = &schema.instance {
-        let errors: Vec<String> = validator
-            .iter_errors(instance)
-            .map(|e| format!("{}: {}", e.instance_path(), e))
-            .collect();
-
-        if !errors.is_empty() {
-            let mut error = ValidationError::new("instance_validation_failed");
-            error.message = Some("实例数据不符合模板定义的JSON Schema".into());
-            errors.iter().for_each(|e_msg| {
-                error.add_param("error".into(), &e_msg);
-            });
-            return Err(error);
-        }
-    }
-
-    Ok(())
 }
 
 #[derive(Serialize)]
@@ -113,7 +82,7 @@ pub struct UpdateTemplateRequest {
     #[validate(length(min = 1, message = "模板描述不能为空"))]
     pub description: Option<String>,
 
-    #[validate(custom(function = "validate_template_schema"))]
+    #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: Option<TemplateSchema>,
 }
 
@@ -122,4 +91,55 @@ pub struct UpdateTemplateRequest {
 pub struct ModifyTemplateStatusRequest {
     pub template_id: uuid::Uuid,
     pub is_active: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+pub struct TemplateSchema {
+    pub schema_def: Value,
+    pub instance: Option<Value>,
+}
+
+impl TemplateSchema {
+    pub fn new(schema_def: Value, instance: Option<Value>) -> Self {
+        TemplateSchema {
+            schema_def,
+            instance,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        let validator = jsonschema::validator_for(&self.schema_def).map_err(|e| {
+            let mut error = ValidationError::new("invalid_json_schema");
+            error.message = Some(format!("无效的JSON Schema: {}", e).into());
+            error
+        })?;
+
+        if let Some(instance) = &self.instance {
+            validate_instance(&validator, instance)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn validate_instance(
+    validator: &jsonschema::Validator,
+    instance: &Value,
+) -> Result<(), ValidationError> {
+    let errors: Vec<String> = validator
+        .iter_errors(instance)
+        .map(|e| format!("{}: {}", e.instance_path(), e))
+        .collect();
+
+    if !errors.is_empty() {
+        let mut error = ValidationError::new("instance_validation_failed");
+
+        let combined_msg = format!("Schema校验失败: {}", errors.join("; "));
+        error.message = Some(Cow::from(combined_msg));
+
+        return Err(error);
+    }
+
+    Ok(())
 }

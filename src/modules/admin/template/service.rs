@@ -11,7 +11,7 @@ use crate::{
 pub async fn create_template(
     pool: &PgPool,
     req: CreateTemplateRequest,
-    user_id: uuid::Uuid,
+    user_id: &uuid::Uuid,
 ) -> Result<TemplateDTO, AppError> {
     let row = sqlx::query!(
         r#"
@@ -37,7 +37,7 @@ pub async fn create_template(
         schema_def: req.schema.schema_def,
         is_active: row.is_active,
         created_at: row.created_at,
-        created_by: Some(user_id),
+        created_by: Some(*user_id),
         updated_at: row.updated_at,
     };
 
@@ -79,8 +79,8 @@ pub async fn query_templates(
             schema_def,
             is_active,
             created_at,
-            created_by,
-            updated_at
+            updated_at,
+            created_by
         FROM sys_template
         WHERE
             ($1::uuid IS NULL OR template_id = $1)
@@ -120,7 +120,7 @@ pub async fn update_template(
 ) -> Result<TemplateDTO, AppError> {
     let row = sqlx::query!(
         r#"
-        UPDATE sys_template
+        UPDATE sys_template st
         SET name = COALESCE($1, name),
             category = COALESCE($2, category),
             description = COALESCE($3, description),

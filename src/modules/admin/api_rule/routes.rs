@@ -54,7 +54,7 @@ pub async fn grant_user_api_rule_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     req.validate().map_err(AppError::ValidationError)?;
-    let dto = grant_user_api_access_rule(&app_state.pool, &req, &user.sub, &user.username).await?;
+    let dto = grant_user_api_access_rule(&app_state.pool, &req, &user.sub).await?;
 
     Ok(AppResponse::created(dto, "授予用户 API 访问规则成功"))
 }

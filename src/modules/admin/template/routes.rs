@@ -50,7 +50,7 @@ pub async fn create_template_handler(
         req.0.validate().map_err(AppError::ValidationError)?;
         req.0
     };
-    let dto = create_template(&app_state.pool, req, user.sub).await?;
+    let dto = create_template(&app_state.pool, req, &user.sub).await?;
 
     Ok(AppResponse::created(dto, "收集模板创建成功"))
 }

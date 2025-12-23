@@ -11,7 +11,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 static API_PATTERN_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(/[a-z_]+)+/$").expect("Failed to compile API pattern regex"));
+    LazyLock::new(|| Regex::new(r"^(/[a-z_0-9\-]+)+/$").expect("Failed to compile API pattern regex"));
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
@@ -81,5 +81,5 @@ pub struct ApiRuleDTO {
     pub created_at: DateTime<Utc>,
 
     #[cfg_attr(feature = "swagger", schema(example = "系统管理员"))]
-    pub granted_by: String,
+    pub granted_by: Option<Uuid>,
 }

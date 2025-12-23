@@ -1,0 +1,90 @@
+use std::{ops::Deref, sync::Arc};
+
+use dashmap::DashMap;
+use jsonschema::Validator;
+use serde::Deserialize;
+use sqlx::Postgres;
+
+use crate::domain::QuerySort;
+
+pub struct SchemaValidatorCache(DashMap<uuid::Uuid, Arc<Validator>>);
+
+impl SchemaValidatorCache {
+    pub fn new() -> Self {
+        Self(DashMap::new())
+    }
+}
+
+impl Deref for SchemaValidatorCache {
+    type Target = DashMap<uuid::Uuid, Arc<Validator>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Deserialize)]
+pub struct SchemaFilter {
+    pub field: String,
+    pub value: String,
+    pub operator: SchemaFilterOperator,
+}
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum SchemaFilterOperator {
+    EQ,
+    GT,
+    LT,
+    LIKE,
+}
+
+pub fn build_where_clause<'a>(
+    query_builder: &mut sqlx::QueryBuilder<'a, Postgres>,
+    filters: &'a Vec<SchemaFilter>,
+) {
+    for schema_filter in filters {
+        query_builder.push(" AND ");
+        match schema_filter.operator {
+            SchemaFilterOperator::EQ => {
+                query_builder.push("archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(" = ");
+                query_builder.push_bind(&schema_filter.value);
+            }
+            SchemaFilterOperator::GT => {
+                query_builder.push("archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(" > ");
+                query_builder.push_bind(&schema_filter.value);
+            }
+            SchemaFilterOperator::LT => {
+                query_builder.push("archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(" < ");
+                query_builder.push_bind(&schema_filter.value);
+            }
+            SchemaFilterOperator::LIKE => {
+                query_builder.push("archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(" ILIKE ");
+                query_builder.push_bind(&schema_filter.value);
+            }
+        }
+    }
+}
+
+pub fn build_sort_clause<'a>(
+    query_builder: &mut sqlx::QueryBuilder<'a, Postgres>,
+    sort: &'a Option<QuerySort>,
+) {
+    if let Some(sort) = sort {
+        query_builder.push(" ORDER BY ");
+        query_builder.push("archive_record.data ->> ");
+        query_builder.push_bind(&sort.field);
+        query_builder.push(" ");
+        query_builder.push_bind(sort.order.as_str());
+    }
+}

@@ -32,6 +32,7 @@ utoipa = { version = "5", features = ["actix_extras", "uuid", "chrono", "debug"]
 utoipa-swagger-ui = { version = "8", features = ["actix-web"], optional = true }
 regex = "1"
 jsonschema = "0.37"
+dashmap = "6"
 
 [dependencies.sqlx]
 version = "0.8.6"

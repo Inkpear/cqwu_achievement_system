@@ -16,7 +16,6 @@ pub async fn grant_user_api_access_rule(
     pool: &PgPool,
     req: &GrantUserApiRuleRequest,
     granted_by: &Uuid,
-    username: &str,
 ) -> Result<ApiRuleDTO, AppError> {
     check_api_rule_conflict(pool, req).await?;
 
@@ -52,7 +51,7 @@ pub async fn grant_user_api_access_rule(
         http_method: req.http_method.clone(),
         expires_at: req.expires_at,
         created_at: row.created_at,
-        granted_by: username.to_string(),
+        granted_by: Some(*granted_by),
     };
 
     Ok(dto)
@@ -141,16 +140,15 @@ pub async fn query_user_api_access_rules(
         ApiRuleDTO,
         r#"
         SELECT 
-            ar.rule_id,
-            ar.api_pattern,
-            ar.http_method,
-            ar.expires_at,
-            ar.created_at,
-            COALESCE(u.nickname, '未知用户') as "granted_by!"
-        FROM sys_access_rule ar
-        LEFT JOIN sys_user u ON ar.granted_by = u.user_id
-        WHERE ar.user_id = $1
-        ORDER BY ar.created_at DESC
+            rule_id,
+            api_pattern,
+            http_method,
+            expires_at,
+            created_at,
+            granted_by
+        FROM sys_access_rule
+        WHERE user_id = $1
+        ORDER BY created_at DESC
         LIMIT $2 OFFSET $3
         "#,
         req.user_id,

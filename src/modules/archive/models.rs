@@ -1,12 +1,15 @@
+use std::sync::LazyLock;
+
 use crate::{
     common::pagination::{default_page, default_page_size},
-    domain::QuerySort,
+    domain::{QuerySort, SchemaFileFieldConfigs},
     utils::schema::SchemaFilter,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 #[derive(Serialize, Deserialize, FromRow)]
@@ -22,7 +25,7 @@ pub struct ArchiveRecordDTO {
 #[derive(Deserialize)]
 pub struct CreateArchiveRecordRequest {
     pub data: serde_json::Value,
-    pub file_session_id: Option<Uuid>,
+    pub session_id: Option<Uuid>,
 }
 
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
@@ -43,4 +46,38 @@ impl QueryArchiveRecordsRequest {
     pub fn offset(&self) -> i64 {
         (self.page - 1) * self.page_size
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct UploadSession {
+    pub user_id: Uuid,
+    pub schema_file_configs: SchemaFileFieldConfigs,
+}
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Serialize)]
+pub struct PresignedResponse {
+    pub url: String,
+    pub file_id: Uuid,
+}
+
+static VALIDATE_FILE_NAME: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"^.+\.[a-zA-Z0-9]+$").expect("校验文件名的正则表达式语法错误")
+});
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Deserialize, Validate)]
+pub struct PreSignedRequests {
+    pub session_id: Uuid,
+
+    #[cfg_attr(feature = "swagger", schema(example = "attachment"))]
+    #[validate(length(min = 1, message = "字段名称不能为空"))]
+    pub field: String,
+
+    #[validate(regex(path = "VALIDATE_FILE_NAME", message = "无效的文件名格式"))]
+    #[cfg_attr(feature = "swagger", schema(example = "document.pdf"))]
+    pub filename: String,
+
+    #[cfg_attr(feature = "swagger", schema(example = 1048576))]
+    pub content_length: i64,
 }

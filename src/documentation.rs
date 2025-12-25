@@ -32,6 +32,8 @@ use utoipa::{
         crate::modules::admin::template::routes::modify_template_status_handler,
         crate::modules::archive::routes::create_archive_record_handler,
         crate::modules::archive::routes::query_archive_records_handler,
+        crate::modules::archive::routes::init_upload_session_handler,
+        crate::modules::archive::routes::presigned_upload_url_handler,
     ),
     components(
         schemas(
@@ -54,7 +56,6 @@ use utoipa::{
             PageData<ApiRuleDTO>,
             UserRole,
             CreateTemplateRequest,
-            TemplateSchema,
             TemplateDTO,
             AppResponse<TemplateDTO>,
             AppResponse<PageData<TemplateDTO>>,
@@ -65,6 +66,7 @@ use utoipa::{
             QueryArchiveRecordsRequest,
             AppResponse<ArchiveRecordDTO>,
             AppResponse<PageData<ArchiveRecordDTO>>,
+            PresignedResponse
         )
     ),
     modifiers(&SecurityAddon),

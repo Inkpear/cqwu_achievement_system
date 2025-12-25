@@ -70,7 +70,7 @@ async fn create_archive_and_query_success() {
         check_response_code_and_message(&archive_response, 201, "创建归档记录成功");
     }
 
-    let filters = vec![("username", "LIKE", "u%"), ("age", "GT", "22")];
+    let filters = vec![("username", "LIKE", "u%"), ("age", "GT", "26")];
     let body = serde_json::json!({
         "filters": filters.iter().map(|(field, op, value)| {
             serde_json::json!({
@@ -95,9 +95,7 @@ async fn create_archive_and_query_success() {
         .as_array()
         .expect("items should be an array");
 
-    assert_eq!(items.len(), 7);
-
-    dbg!(items);
+    assert_eq!(items.len(), 3);
 }
 
 #[tokio::test]
@@ -288,4 +286,102 @@ async fn a_normal_user_can_not_create_or_query_archive_without_permission() {
         .post_query_archive_records(&template_id.to_string(), &serde_json::json!({}))
         .await;
     assert_eq!(query_res.status().as_u16(), 403);
+}
+
+#[tokio::test]
+async fn submit_a_invalid_archive_query_missing_400() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "无效查询测试模板",
+        "category": "测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "field1": { "type": "string" }
+                },
+                "required": ["field1"]
+            },
+            "instance": { "field1": "value1" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let invalid_query_body = serde_json::json!({
+        "filters": [
+            { "field": "field1", "operator": "GT", "value": "value" }
+        ]
+    });
+
+    let query_res = app
+        .post_query_archive_records(template_id, &invalid_query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+
+    check_response_code_and_message(&query_res, 400, "构造JSON Schema 查询失败");
+}
+
+#[tokio::test]
+async fn create_a_file_template_and_query_it_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let body = serde_json::json!({
+        "name": "文件模板",
+        "category": "文件收集",
+        "description": "用于收集文件的模板",
+        "schema": {
+            "schema_def": {
+                "name": "文件信息定义",
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" }
+                }
+            }
+        },
+        "schema_files": [
+            {
+                "field": "附件",
+                "file_config": {
+                    "allowed_types": [".jpg", ".pdf"],
+                    "quota": 2,
+                    "max_size": 1048576,
+                    "required": true,
+                }
+            }
+        ]
+    });
+
+    let response = app
+        .post_create_template(&body)
+        .await;
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 201, "收集模板创建成功");
+
+    let template_id = response["data"]["template_id"]
+        .as_str()
+        .expect("template_id should be a string");
+    let query_response = app
+        .get_query_templates(Some(template_id), None, None, 1, 10)
+        .await;
+    assert_eq!(query_response.status().as_u16(), 200);
 }

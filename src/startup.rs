@@ -14,7 +14,7 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     middleware::auth::mw_authentication,
     modules::{admin, archive, auth, health_check::health_check_handler, user},
-    utils::schema::SchemaValidatorCache,
+    utils::{redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache},
 };
 
 #[cfg(feature = "swagger")]
@@ -56,7 +56,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, a
                     .wrap(from_fn(mw_authentication))
                     .configure(admin::config)
                     .configure(user::config)
-                    .configure(archive::config)
+                    .configure(archive::config),
             );
 
         app
@@ -87,9 +87,11 @@ impl Application {
         );
 
         let jwt_config = configuration.jwt;
-        let schema_cache = SchemaValidatorCache::new();
+        let schema_cache = SchemaContextCache::new();
+        let s3_storage = S3Storage::from_config(&configuration.storage).await;
+        let redis_cache = RedisCache::from_config(&configuration.redis);
 
-        let app_state = AppState::new(connection_pool, jwt_config, schema_cache);
+        let app_state = AppState::new(connection_pool, jwt_config, schema_cache, s3_storage, redis_cache);
 
         let listener = std::net::TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();

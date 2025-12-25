@@ -120,7 +120,7 @@ pub async fn update_template_handler(
         req.0
     };
 
-    let dto = update_template(&app_state.pool, &user.username, &req).await?;
+    let dto = update_template(&app_state.pool, &user.username, req).await?;
 
     Ok(AppResponse::success_msg(dto, "收集模板更新成功"))
 }

@@ -11,6 +11,9 @@ pub enum AppError {
     #[error("参数校验失败")]
     ValidationError(ValidationErrors),
 
+    #[error("{0}")]
+    ValidationMessage(String),
+
     #[error("用户已经存在，请勿重复注册")]
     UserAlreadyExists,
 
@@ -57,7 +60,9 @@ impl std::fmt::Debug for AppError {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            AppError::ValidationError(_) | AppError::BuildSchemaQueryFailed => StatusCode::BAD_REQUEST,
+            AppError::ValidationError(_)
+            | AppError::BuildSchemaQueryFailed
+            | AppError::ValidationMessage(_) => StatusCode::BAD_REQUEST,
             AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,

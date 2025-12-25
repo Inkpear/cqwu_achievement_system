@@ -8,6 +8,16 @@ application:
 
 log:
   log_level: "trace"
-  
+
 jwt:
   expiration: 86400 # seconds
+
+storage:
+  endpoint: "http://10.41.94.104:9000"
+  access_key: "root"
+  secret_key: "admin123"
+  sig_exp_seconds: 1800 # 30 minutes 
+  view_exp_seconds: 86400 # 24 hours
+
+redis:
+  uri: "redis://:admin123@192.168.31.199:6379/1"

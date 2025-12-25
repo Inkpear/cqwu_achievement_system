@@ -1,10 +1,11 @@
-use std::borrow::Cow;
-
-use crate::common::pagination::{default_page, default_page_size};
+use crate::{
+    common::pagination::{default_page, default_page_size},
+    domain::{SchemaFileDefinition, TemplateSchema},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use validator::{Validate, ValidationError};
+use validator::Validate;
 
 #[cfg(feature = "swagger")]
 use utoipa::ToSchema;
@@ -26,6 +27,8 @@ pub struct CreateTemplateRequest {
 
     #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: TemplateSchema,
+
+    pub schema_files: Option<Vec<SchemaFileDefinition>>,
 }
 
 #[derive(Serialize)]
@@ -84,6 +87,8 @@ pub struct UpdateTemplateRequest {
 
     #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: Option<TemplateSchema>,
+
+    pub schema_files: Option<Vec<SchemaFileDefinition>>,
 }
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
@@ -91,55 +96,4 @@ pub struct UpdateTemplateRequest {
 pub struct ModifyTemplateStatusRequest {
     pub template_id: uuid::Uuid,
     pub is_active: bool,
-}
-
-#[derive(Deserialize, Serialize)]
-#[cfg_attr(feature = "swagger", derive(ToSchema))]
-pub struct TemplateSchema {
-    pub schema_def: Value,
-    pub instance: Option<Value>,
-}
-
-impl TemplateSchema {
-    pub fn new(schema_def: Value, instance: Option<Value>) -> Self {
-        TemplateSchema {
-            schema_def,
-            instance,
-        }
-    }
-
-    pub fn validate(&self) -> Result<(), ValidationError> {
-        let validator = jsonschema::validator_for(&self.schema_def).map_err(|e| {
-            let mut error = ValidationError::new("invalid_json_schema");
-            error.message = Some(format!("无效的JSON Schema: {}", e).into());
-            error
-        })?;
-
-        if let Some(instance) = &self.instance {
-            validate_instance(&validator, instance)?;
-        }
-
-        Ok(())
-    }
-}
-
-pub fn validate_instance(
-    validator: &jsonschema::Validator,
-    instance: &Value,
-) -> Result<(), ValidationError> {
-    let errors: Vec<String> = validator
-        .iter_errors(instance)
-        .map(|e| format!("{}: {}", e.instance_path(), e))
-        .collect();
-
-    if !errors.is_empty() {
-        let mut error = ValidationError::new("instance_validation_failed");
-
-        let combined_msg = format!("Schema校验失败: {}", errors.join("; "));
-        error.message = Some(Cow::from(combined_msg));
-
-        return Err(error);
-    }
-
-    Ok(())
 }

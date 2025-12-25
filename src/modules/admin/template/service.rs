@@ -2,6 +2,7 @@ use sqlx::PgPool;
 
 use crate::{
     common::{error::AppError, pagination::PageData},
+    domain::SchemaFileDefinition,
     modules::admin::template::models::{
         CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO, UpdateTemplateRequest,
     },
@@ -10,9 +11,19 @@ use crate::{
 #[tracing::instrument(name = "插入模板到数据库", skip(pool, req))]
 pub async fn create_template(
     pool: &PgPool,
-    req: CreateTemplateRequest,
+    mut req: CreateTemplateRequest,
     user_id: &uuid::Uuid,
 ) -> Result<TemplateDTO, AppError> {
+    if let Some(files) = req.schema_files {
+        for SchemaFileDefinition {
+            field,
+            file_config,
+        } in files
+        {
+            file_config.into_schema(&field, &mut req.schema.schema_def);
+        }
+    }
+
     let row = sqlx::query!(
         r#"
         INSERT INTO sys_template (name, category, description, schema_def, created_by)
@@ -116,8 +127,21 @@ pub async fn query_templates(
 pub async fn update_template(
     pool: &PgPool,
     username: &str,
-    req: &UpdateTemplateRequest,
+    mut req: UpdateTemplateRequest,
 ) -> Result<TemplateDTO, AppError> {
+    if let Some(files) = req.schema_files {
+        for SchemaFileDefinition {
+            field,
+            file_config,
+        } in files
+        {
+            file_config.into_schema(
+                &field,
+                &mut req.schema.as_mut().unwrap().schema_def,
+            );
+        }
+    }
+
     let row = sqlx::query!(
         r#"
         UPDATE sys_template st

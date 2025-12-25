@@ -1,7 +1,11 @@
-pub mod http_method;
-pub mod user_role;
-pub mod query_sort;
+mod file_metadata;
+mod http_method;
+mod query_sort;
+mod schema;
+mod user_role;
 
+pub use file_metadata::FileMetadata;
 pub use http_method::HttpMethod;
-pub use user_role::UserRole;
 pub use query_sort::{QuerySort, SortOrder};
+pub use schema::*;
+pub use user_role::UserRole;

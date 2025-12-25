@@ -12,6 +12,14 @@ pub fn config(cfg: &mut actix_web::web::ServiceConfig) {
             .route(
                 "/{template_id}/query",
                 actix_web::web::post().to(routes::query_archive_records_handler),
+            )
+            .route(
+                "/{template_id}/init_upload",
+                actix_web::web::post().to(routes::init_upload_session_handler),
+            )
+            .route(
+                "/{template_id}/presigned",
+                actix_web::web::post().to(routes::presigned_upload_url_handler),
             ),
     );
 }

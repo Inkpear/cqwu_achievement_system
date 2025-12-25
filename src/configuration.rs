@@ -47,6 +47,8 @@ pub struct Settings {
     pub application: ApplicationSettings,
     pub log: LogSettings,
     pub jwt: JwtConfig,
+    pub storage: StorageSettings,
+    pub redis: RedisSettings,
 }
 
 enum Environment {
@@ -83,6 +85,21 @@ pub struct LogSettings {
     pub log_path: String,
     pub log_prefix: String,
     pub log_level: String,
+}
+#[derive(serde::Deserialize, Clone)]
+pub struct RedisSettings {
+    pub uri: String,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct StorageSettings {
+    pub endpoint: String,
+    pub region: String,
+    pub access_key: String,
+    pub secret_key: SecretString,
+    pub bucket_name: String,
+    pub sig_exp_seconds: u64,
+    pub view_exp_seconds: u64,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

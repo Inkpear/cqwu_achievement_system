@@ -16,7 +16,7 @@ pub async fn grant_user_api_access_rule(
     pool: &PgPool,
     req: &GrantUserApiRuleRequest,
     granted_by: &Uuid,
-) -> Result<Uuid, AppError> {
+) -> Result<ApiRuleDTO, AppError> {
     check_api_rule_conflict(pool, req).await?;
 
     let row = sqlx::query!(
@@ -25,7 +25,7 @@ pub async fn grant_user_api_access_rule(
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (user_id, api_pattern, http_method)
         DO UPDATE SET expires_at = $4, granted_by = $5, description = $6
-        RETURNING rule_id
+        RETURNING rule_id, created_at
         "#,
         req.user_id,
         req.api_pattern,
@@ -45,7 +45,16 @@ pub async fn grant_user_api_access_rule(
         AppError::UnexpectedError(e.into())
     })?;
 
-    Ok(row.rule_id)
+    let dto = ApiRuleDTO {
+        rule_id: row.rule_id,
+        api_pattern: req.api_pattern.clone(),
+        http_method: req.http_method.clone(),
+        expires_at: req.expires_at,
+        created_at: row.created_at,
+        granted_by: Some(*granted_by),
+    };
+
+    Ok(dto)
 }
 
 #[tracing::instrument(name = "检查 API 访问规则冲突", skip(pool, req))]
@@ -131,16 +140,15 @@ pub async fn query_user_api_access_rules(
         ApiRuleDTO,
         r#"
         SELECT 
-            ar.rule_id,
-            ar.api_pattern,
-            ar.http_method,
-            ar.expires_at,
-            ar.created_at,
-            COALESCE(u.nickname, '未知用户') as "granted_by!"
-        FROM sys_access_rule ar
-        LEFT JOIN sys_user u ON ar.granted_by = u.user_id
-        WHERE ar.user_id = $1
-        ORDER BY ar.created_at DESC
+            rule_id,
+            api_pattern,
+            http_method,
+            expires_at,
+            created_at,
+            granted_by
+        FROM sys_access_rule
+        WHERE user_id = $1
+        ORDER BY created_at DESC
         LIMIT $2 OFFSET $3
         "#,
         req.user_id,

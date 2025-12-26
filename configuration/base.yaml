@@ -13,3 +13,7 @@ log:
 
 jwt:
   secret: "your-secret-key-change-this-in-production"
+
+storage:
+  region: "cn-north-1"
+  bucket_name: "achievement-bucket"

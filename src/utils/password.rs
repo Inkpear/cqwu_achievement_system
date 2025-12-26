@@ -26,6 +26,7 @@ fn verify_password_hash(password: SecretString, hash: SecretString) -> Result<()
     Ok(())
 }
 
+#[tracing::instrument(name = "哈希密码", skip(password))]
 pub async fn hash_password(password: SecretString) -> Result<SecretString, anyhow::Error> {
     spawn_blocking_with_tracing(move || compute_password_hash(password)).await?
 }

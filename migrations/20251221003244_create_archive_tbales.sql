@@ -2,7 +2,7 @@
 CREATE TABLE
     sys_template (
         template_id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-        name VARCHAR(100) NOT NULL UNIQUE, -- 模板名称
+        name VARCHAR(100) NOT NULL, -- 模板名称
         category VARCHAR(50) NOT NULL, -- 分类
         description TEXT,
         schema_def JSONB NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE
 CREATE TABLE
     archive_record (
         record_id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-        template_id UUID NOT NULL REFERENCES sys_template (template_id) ON DELETE CASCADE,
+        template_id UUID NOT NULL REFERENCES sys_template (template_id) ON DELETE RESTRICT,
         data JSONB NOT NULL,
         created_by UUID REFERENCES sys_user (user_id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),

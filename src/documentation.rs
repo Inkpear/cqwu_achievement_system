@@ -4,8 +4,10 @@ use crate::domain::{HttpMethod, UserRole};
 use crate::modules::admin::api_rule::models::*;
 use crate::modules::admin::template::models::*;
 use crate::modules::admin::user::models::*;
+use crate::modules::archive::models::*;
 use crate::modules::auth::models::*;
 use crate::modules::user::models::*;
+
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -26,7 +28,14 @@ use utoipa::{
         crate::modules::admin::template::routes::create_template_handler,
         crate::modules::admin::template::routes::query_templates_handler,
         crate::modules::admin::template::routes::update_template_handler,
-        crate::modules::admin::template::routes::delete_template_handler
+        crate::modules::admin::template::routes::delete_template_handler,
+        crate::modules::admin::template::routes::modify_template_status_handler,
+        crate::modules::admin::template::routes::get_all_template_categories,
+        crate::modules::archive::routes::create_archive_record_handler,
+        crate::modules::archive::routes::query_archive_records_handler,
+        crate::modules::archive::routes::init_upload_session_handler,
+        crate::modules::archive::routes::presigned_upload_url_handler,
+        crate::modules::archive::routes::delete_archive_record_handler,
     ),
     components(
         schemas(
@@ -38,24 +47,28 @@ use utoipa::{
             ChangeUserPasswordRequest,
             ModifyUserStatusRequest,
             GrantUserApiRuleRequest,
-            GrantUserApiRuleResponse,
             QueryUserApiRuleRequest,
             QueryUserRequest,
             ApiRuleDTO,
             HttpMethod,
             AppResponse<UserDTO>,
             AppResponse<LoginResponse>,
-            AppResponse<GrantUserApiRuleResponse>,
             AppResponse<PageData<ApiRuleDTO>>,
             AppResponse<PageData<UserDTO>>,
             PageData<ApiRuleDTO>,
             UserRole,
             CreateTemplateRequest,
-            TemplateSchema,
             TemplateDTO,
             AppResponse<TemplateDTO>,
             AppResponse<PageData<TemplateDTO>>,
-            PageData<TemplateDTO>
+            PageData<TemplateDTO>,
+            ModifyTemplateStatusRequest,
+            CreateArchiveRecordRequest,
+            ArchiveRecordDTO,
+            QueryArchiveRecordsRequest,
+            AppResponse<ArchiveRecordDTO>,
+            AppResponse<PageData<ArchiveRecordDTO>>,
+            PresignedResponse
         )
     ),
     modifiers(&SecurityAddon),

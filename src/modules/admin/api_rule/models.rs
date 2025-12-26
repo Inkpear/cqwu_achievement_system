@@ -10,8 +10,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-static API_PATTERN_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(/[a-z_]+)+/$").expect("Failed to compile API pattern regex"));
+static API_PATTERN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(/[a-z_0-9\-]+)+/$").expect("Failed to compile API pattern regex")
+});
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
@@ -45,12 +46,6 @@ fn validate_expires_at(timestamp: &DateTime<Utc>) -> Result<(), validator::Valid
 }
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
-#[derive(Serialize)]
-pub struct GrantUserApiRuleResponse {
-    pub rule_id: Uuid,
-}
-
-#[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct QueryUserApiRuleRequest {
     pub user_id: Option<Uuid>,
@@ -80,13 +75,12 @@ pub struct ApiRuleDTO {
     #[cfg_attr(feature = "swagger", schema(example = "/api/user/"))]
     pub api_pattern: String,
 
-    #[cfg_attr(feature = "swagger", schema(example = "GET"))]
-    pub http_method: String,
+    pub http_method: HttpMethod,
 
     pub expires_at: Option<DateTime<Utc>>,
 
     pub created_at: DateTime<Utc>,
 
     #[cfg_attr(feature = "swagger", schema(example = "系统管理员"))]
-    pub granted_by: String,
+    pub granted_by: Option<Uuid>,
 }

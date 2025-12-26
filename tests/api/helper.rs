@@ -10,6 +10,7 @@ use cqwu_achievement_system::{
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
 };
+use rand::{Rng, distr::Alphanumeric};
 use reqwest::header::HeaderMap;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -257,6 +258,120 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn patch_modify_template_status(
+        &self,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .patch(&format!(
+                "{}/api/admin/template/modify_status",
+                self.address
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_create_archive_record(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/create",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_query_archive_records(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/query",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_init_upload_session(&self, template_id: &str) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/archive/{}/init_upload",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_presigned_upload_url(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/presigned",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn put_to_upload_file(
+        &self,
+        upload_url: &str,
+        file_content: &Vec<u8>,
+        content_type: &str,
+        filename: &str,
+    ) -> reqwest::Response {
+        let filename = urlencoding::encode(filename);
+        reqwest::Client::new()
+            .put(upload_url)
+            .header("Content-Type", content_type)
+            .header("x-amz-meta-original-filename", filename.as_ref())
+            .body(file_content.clone())
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_archive_record(&self, record_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/archive/{}/delete",
+                self.address, record_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_all_template_categories(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/admin/template/all_categories",
+                self.address
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {
@@ -367,4 +482,12 @@ pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, 
         msg,
         response
     );
+}
+
+pub fn generate_a_dummy_file_content(file_size: usize) -> Vec<u8> {
+    let mut rng = rand::rng();
+    let content: String = (0..file_size)
+        .map(|_| rng.sample(Alphanumeric) as char)
+        .collect();
+    content.into_bytes()
 }

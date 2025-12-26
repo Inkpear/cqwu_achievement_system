@@ -618,3 +618,97 @@ async fn patch_to_update_a_template_and_raw_template_some_value_not_change() {
     assert_eq!(data["category"], "测试");
     assert_eq!(data["description"], "仅更新描述字段");
 }
+
+#[tokio::test]
+async fn modify_template_status_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "状态修改模板",
+        "category": "测试",
+        "description": "用于测试模板状态修改功能",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let modify_status_body = serde_json::json!({
+        "template_id": template_id,
+        "is_active": false
+    });
+
+    let modify_response = app
+        .patch_modify_template_status(&modify_status_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&modify_response, 200, "收集模板状态修改成功");
+}
+
+#[tokio::test]
+async fn get_all_template_categories() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let body1 = serde_json::json!({
+        "name": "分类X模板",
+        "category": "分类X",
+        "description": "属于分类X",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let body2 = serde_json::json!({
+        "name": "分类Y模板",
+        "category": "分类Y",
+        "description": "属于分类Y",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    app.post_create_template(&body1).await;
+    app.post_create_template(&body2).await;
+
+    let response = app
+        .get_all_template_categories()
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "获取所有模板分类成功");
+
+    let data = &response["data"];
+    let categories = data.as_array().unwrap();
+    assert!(categories.iter().any(|c| c.as_str().unwrap() == "分类X"));
+    assert!(categories.iter().any(|c| c.as_str().unwrap() == "分类Y"));
+}

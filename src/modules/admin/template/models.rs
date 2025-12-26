@@ -1,8 +1,11 @@
-use crate::common::pagination::{default_page, default_page_size};
+use crate::{
+    common::pagination::{default_page, default_page_size},
+    domain::{SchemaFileDefinition, TemplateSchema},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use validator::{Validate, ValidationError};
+use validator::Validate;
 
 #[cfg(feature = "swagger")]
 use utoipa::ToSchema;
@@ -22,41 +25,10 @@ pub struct CreateTemplateRequest {
     #[cfg_attr(feature = "swagger", schema(example = "用于收集用户基本信息的模板"))]
     pub description: Option<String>,
 
-    #[validate(custom(function = "validate_template_schema"))]
+    #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: TemplateSchema,
-}
 
-#[derive(Deserialize, Serialize)]
-#[cfg_attr(feature = "swagger", derive(ToSchema))]
-pub struct TemplateSchema {
-    pub schema_def: Value,
-    pub instance: Option<Value>,
-}
-
-fn validate_template_schema(schema: &TemplateSchema) -> Result<(), ValidationError> {
-    let validator = jsonschema::validator_for(&schema.schema_def).map_err(|e| {
-        let mut error = ValidationError::new("invalid_json_schema");
-        error.message = Some(format!("无效的JSON Schema: {}", e).into());
-        error
-    })?;
-
-    if let Some(instance) = &schema.instance {
-        let errors: Vec<String> = validator
-            .iter_errors(instance)
-            .map(|e| format!("{}: {}", e.instance_path(), e))
-            .collect();
-
-        if !errors.is_empty() {
-            let mut error = ValidationError::new("instance_validation_failed");
-            error.message = Some("实例数据不符合模板定义的JSON Schema".into());
-            errors.iter().for_each(|e_msg| {
-                error.add_param("error".into(), &e_msg);
-            });
-            return Err(error);
-        }
-    }
-
-    Ok(())
+    pub schema_files: Option<Vec<SchemaFileDefinition>>,
 }
 
 #[derive(Serialize)]
@@ -76,6 +48,7 @@ pub struct TemplateDTO {
     #[cfg_attr(feature = "swagger", schema(example = "json_schema"))]
     pub schema_def: Value,
 
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub created_by: Option<uuid::Uuid>,
     pub updated_at: DateTime<Utc>,
@@ -112,6 +85,15 @@ pub struct UpdateTemplateRequest {
     #[validate(length(min = 1, message = "模板描述不能为空"))]
     pub description: Option<String>,
 
-    #[validate(custom(function = "validate_template_schema"))]
+    #[validate(custom(function = "TemplateSchema::validate"))]
     pub schema: Option<TemplateSchema>,
+
+    pub schema_files: Option<Vec<SchemaFileDefinition>>,
+}
+
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+#[derive(Deserialize)]
+pub struct ModifyTemplateStatusRequest {
+    pub template_id: uuid::Uuid,
+    pub is_active: bool,
 }

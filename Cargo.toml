@@ -32,6 +32,13 @@ utoipa = { version = "5", features = ["actix_extras", "uuid", "chrono", "debug"]
 utoipa-swagger-ui = { version = "8", features = ["actix-web"], optional = true }
 regex = "1"
 jsonschema = "0.37"
+dashmap = "6"
+aws-config = "1.8"
+aws-sdk-s3 = "1.1"
+mime_guess = "2"
+urlencoding = "2.1"
+redis = { version = "1", features = ["tokio-comp", "json"] }
+deadpool-redis = {version = "0.22", features = ["serde"] }
 
 [dependencies.sqlx]
 version = "0.8.6"
@@ -49,3 +56,4 @@ features = [
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }
+rand = "0.9"

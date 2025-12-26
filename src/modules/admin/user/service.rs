@@ -7,9 +7,7 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         pagination::PageData,
     },
-    modules::{
-        admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
-    },
+    modules::admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
 };
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]

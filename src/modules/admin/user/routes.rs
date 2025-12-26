@@ -153,7 +153,7 @@ pub async fn query_users_handler(
     feature = "swagger",
     utoipa::path(
         patch,
-        path = "/api/admin/user/change_password",
+        path = "/api/admin/user/password",
         tag = "管理员-用户管理",
         request_body = ChangeUserPasswordRequest,
         security(

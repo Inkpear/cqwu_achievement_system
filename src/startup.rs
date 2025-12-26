@@ -91,7 +91,13 @@ impl Application {
         let s3_storage = S3Storage::from_config(&configuration.storage).await;
         let redis_cache = RedisCache::from_config(&configuration.redis);
 
-        let app_state = AppState::new(connection_pool, jwt_config, schema_cache, s3_storage, redis_cache);
+        let app_state = AppState::new(
+            connection_pool,
+            jwt_config,
+            schema_cache,
+            s3_storage,
+            redis_cache,
+        );
 
         let listener = std::net::TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();

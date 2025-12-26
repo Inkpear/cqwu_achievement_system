@@ -10,8 +10,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-static API_PATTERN_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(/[a-z_0-9\-]+)+/$").expect("Failed to compile API pattern regex"));
+static API_PATTERN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(/[a-z_0-9\-]+)+/$").expect("Failed to compile API pattern regex")
+});
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]

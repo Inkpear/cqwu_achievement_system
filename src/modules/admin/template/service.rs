@@ -268,3 +268,34 @@ pub async fn check_any_record_exists(
 
     Ok(row.exists)
 }
+
+pub async fn check_template_is_enabled(
+    pool: &PgPool,
+    template_id: &uuid::Uuid,
+) -> Result<(), AppError> {
+    let row = sqlx::query!(
+        r#"
+        SELECT is_active
+        FROM sys_template
+        WHERE template_id = $1
+        "#,
+        template_id
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    match row {
+        Some(record) => {
+            if !record.is_active {
+                tracing::warn!("模板 {} 已被禁用", template_id);
+                return Err(AppError::DataNotFound("关联的模板不存在".into()));
+            }
+            Ok(())
+        }
+        None => {
+            tracing::warn!("未找到模板 {}", template_id);
+            Err(AppError::DataNotFound("关联的模板不存在".into()))
+        }
+    }
+}

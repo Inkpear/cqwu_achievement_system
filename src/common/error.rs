@@ -66,7 +66,9 @@ impl ResponseError for AppError {
             AppError::ValidationError(_)
             | AppError::BuildSchemaQueryFailed
             | AppError::ValidationMessage(_) => StatusCode::BAD_REQUEST,
-            AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) | AppError::DatabaseConflictError(_) => StatusCode::CONFLICT,
+            AppError::UserAlreadyExists
+            | AppError::ApiRuleConflict(_)
+            | AppError::DatabaseConflictError(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
             AppError::DataNotFound(_) => StatusCode::NOT_FOUND,

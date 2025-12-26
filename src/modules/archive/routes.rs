@@ -5,7 +5,7 @@ use validator::Validate;
 use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
-    modules::archive::{
+    modules::{admin::template::service::check_template_is_enabled, archive::{
         models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
         service::{
             check_file_validity, check_need_file, create_archive_record, create_files_record,
@@ -13,7 +13,7 @@ use crate::{
             get_or_load_template_context, init_upload_session, presigned_upload_url,
             query_archive_records, try_to_get_field_quota, validate_instance_by_id,
         },
-    },
+    }},
 };
 
 #[cfg(feature = "swagger")]
@@ -50,6 +50,8 @@ pub async fn create_archive_record_handler(
     req: web::Json<CreateArchiveRecordRequest>,
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
+    check_template_is_enabled(&app_state.pool, &template_id).await?;
+
     validate_instance_by_id(
         &app_state.pool,
         &app_state.schema_cache,
@@ -163,7 +165,7 @@ pub async fn query_archive_records_handler(
         responses(
             (status = 201, description = "初始化上传会话成功", body = AppResponse<Uuid>),
             (status = 404, description = "该模板不包含文件字段，无需初始化上传会话"),
-            (status = 404, description = "模板不存在"),
+            (status = 404, description = "关联的模板不存在"),
         )
     )
 )]
@@ -180,6 +182,8 @@ pub async fn init_upload_session_handler(
     user: AuthenticatedUser,
     template_id: web::Path<Uuid>,
 ) -> Result<impl Responder, AppError> {
+    check_template_is_enabled(&app_state.pool, &template_id).await?;
+
     let schema_context =
         get_or_load_template_context(&app_state.pool, &app_state.schema_cache, &template_id)
             .await?;

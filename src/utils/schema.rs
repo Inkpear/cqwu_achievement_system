@@ -7,7 +7,7 @@ use sqlx::Postgres;
 
 use crate::domain::SchemaFileFieldConfigs;
 
-pub struct TemplateSchemaContext{
+pub struct TemplateSchemaContext {
     pub validator: Validator,
     pub file_field_configs: Option<SchemaFileFieldConfigs>,
 }

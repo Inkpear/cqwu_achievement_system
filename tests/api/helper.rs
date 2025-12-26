@@ -361,6 +361,17 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn get_all_template_categories(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/admin/template/all_categories",
+                self.address
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

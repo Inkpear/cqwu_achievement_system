@@ -617,7 +617,7 @@ async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
         .await
         .expect("Failed to read file content");
     assert_eq!(content, dummy_file_content);
-    
+
     record_res["data"]["record_id"]
         .as_str()
         .and_then(|id_str| Uuid::parse_str(id_str).ok())

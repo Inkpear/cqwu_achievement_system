@@ -187,3 +187,34 @@ pub async fn modify_template_status_handler(
 
     Ok(AppResponse::ok_msg("收集模板状态修改成功"))
 }
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/api/admin/template/categories",
+    tag = "管理员-模板管理",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "获取所有模板分类成功", body = AppResponse<Vec<String>>),
+    )
+))]
+#[tracing::instrument(name = "获取所有模板分类", skip(app_state))]
+pub async fn get_all_template_categories(
+    app_state: web::Data<AppState>,
+) -> Result<impl Responder, AppError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT DISTINCT category
+        FROM sys_template
+        WHERE is_active = true
+        "#
+    )
+    .fetch_all(&app_state.pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    let categories: Vec<String> = rows.into_iter().map(|row| row.category).collect();
+
+    Ok(AppResponse::success_msg(categories, "获取所有模板分类成功"))
+}

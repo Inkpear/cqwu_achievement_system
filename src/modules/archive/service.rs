@@ -80,7 +80,7 @@ async fn from_database_get_template_context(
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     if let None = row {
-        return Err(AppError::DataNotFound("模板不存在".into()));
+        return Err(AppError::DataNotFound("关联的模板不存在".into()));
     }
 
     let schema_def = row.unwrap().schema_def;
@@ -635,7 +635,7 @@ pub async fn enrich_archive_records_with_urls(
             }
         }
     }
-    
+
     if file_ids_to_fetch.is_empty() {
         return Ok(());
     }

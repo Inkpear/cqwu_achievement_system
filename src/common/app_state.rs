@@ -1,6 +1,8 @@
 use sqlx::PgPool;
 
-use crate::utils::{jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache};
+use crate::utils::{
+    jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache,
+};
 
 pub struct AppState {
     pub pool: PgPool,
@@ -11,7 +13,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(pool: PgPool, jwt_config: JwtConfig, schema_cache: SchemaContextCache, s3_storage: S3Storage, redis_cache: RedisCache) -> Self {
+    pub fn new(
+        pool: PgPool,
+        jwt_config: JwtConfig,
+        schema_cache: SchemaContextCache,
+        s3_storage: S3Storage,
+        redis_cache: RedisCache,
+    ) -> Self {
         Self {
             pool,
             jwt_config,

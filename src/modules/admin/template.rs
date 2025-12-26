@@ -14,6 +14,13 @@ pub fn config(cfg: &mut ServiceConfig) {
                 "/delete/{template_id}",
                 web::delete().to(routes::delete_template_handler),
             )
-            .route("/modify_status", web::patch().to(routes::modify_template_status_handler))
+            .route(
+                "/modify_status",
+                web::patch().to(routes::modify_template_status_handler),
+            )
+            .route(
+                "/all_categories",
+                web::get().to(routes::get_all_template_categories),
+            ),
     );
 }

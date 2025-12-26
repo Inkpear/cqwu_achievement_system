@@ -17,10 +17,11 @@ pub async fn create_template(
     if let Some(files) = req.schema_files {
         for SchemaFileDefinition {
             field,
+            title,
             file_config,
         } in files
         {
-            file_config.into_schema(&field, &mut req.schema.schema_def);
+            file_config.into_schema(&field, &mut req.schema.schema_def, &title);
         }
     }
 
@@ -132,13 +133,11 @@ pub async fn update_template(
     if let Some(files) = req.schema_files {
         for SchemaFileDefinition {
             field,
+            title,
             file_config,
         } in files
         {
-            file_config.into_schema(
-                &field,
-                &mut req.schema.as_mut().unwrap().schema_def,
-            );
+            file_config.into_schema(&field, &mut req.schema.as_mut().unwrap().schema_def, &title);
         }
     }
 

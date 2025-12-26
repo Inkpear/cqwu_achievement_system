@@ -44,7 +44,7 @@ fn validate_allowed_types(types: &Vec<String>) -> Result<(), ValidationError> {
 }
 
 impl SchemaFileFieldConfig {
-    pub fn into_schema(self, field: &str, schema: &mut Value) {
+    pub fn into_schema(self, field: &str, schema: &mut Value, title: &str) {
         if !schema.is_object() {
             *schema = serde_json::json!({"type": "object", "properties": {}});
         }
@@ -83,6 +83,8 @@ impl SchemaFileFieldConfig {
                 Value::Number(serde_json::Number::from(self.quota)),
             );
         }
+        field_def.insert("title".to_string(), Value::String(title.to_string()));
+        
         if self.required {
             let required_array = schema
                 .as_object_mut()
@@ -170,6 +172,9 @@ pub struct SchemaFileDefinition {
     #[cfg_attr(feature = "swagger", schema(example = "profile_picture"))]
     #[validate(length(min = 1, message = "字段名称不能为空"))]
     pub field: String,
+    #[cfg_attr(feature = "swagger", schema(example = "用户头像"))]
+    #[validate(length(min = 1, message = "文件标题不能为空"))]
+    pub title: String,
     pub file_config: SchemaFileFieldConfig,
 }
 

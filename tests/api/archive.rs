@@ -354,7 +354,8 @@ async fn create_a_file_template_and_query_it_success() {
         },
         "schema_files": [
             {
-                "field": "附件",
+                "field": "head",
+                "title": "用户头像",
                 "file_config": {
                     "allowed_types": [".jpg", ".pdf"],
                     "quota": 2,
@@ -384,4 +385,16 @@ async fn create_a_file_template_and_query_it_success() {
         .get_query_templates(Some(template_id), None, None, 1, 10)
         .await;
     assert_eq!(query_response.status().as_u16(), 200);
+    let query_response = query_response
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&query_response, 200, "查询收集模板成功");
+    let prop = &query_response["data"]["items"][0]["schema_def"]["properties"];
+    assert_eq!(prop["head"]["type"], "array");
+    assert_eq!(prop["head"]["items"]["type"], "string");
+    assert_eq!(prop["head"]["items"]["format"], "file-id");
+    assert_eq!(prop["head"]["maxItems"], 2);
+    assert_eq!(prop["head"]["title"], "用户头像");
+    // dbg!(query_response);
 }

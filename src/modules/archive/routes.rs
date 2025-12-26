@@ -247,7 +247,7 @@ pub async fn presigned_upload_url_handler(
         &req.session_id,
         &content_type,
         req.content_length,
-        &content_type,
+        &req.filename,
     )
     .await?;
 

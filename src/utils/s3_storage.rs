@@ -69,7 +69,7 @@ impl S3Storage {
             .key(object_key)
             .content_type(content_type)
             .content_length(content_length)
-            .metadata("original-filename", filename.as_ref())
+            .metadata("original-filename", filename)
             .presigned(presigned_config)
             .await?;
 

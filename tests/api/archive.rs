@@ -423,7 +423,7 @@ async fn init_upload_session_and_get_upload_urls_success() {
                 "field": "document",
                 "title": "文档文件",
                 "file_config": {
-                    "allowed_types": [".docx", ".pdf"],
+                    "allowed_types": [".docx", ".pdf", ".png"],
                     "quota": 1,
                     "max_size": 2097152,
                     "required": true,
@@ -458,13 +458,12 @@ async fn init_upload_session_and_get_upload_urls_success() {
         .as_str()
         .expect("upload_session_id should be a string");
     assert!(!upload_session_id.is_empty());
-    // dbg!(upload_session_id);
     let upload_session_id = Uuid::parse_str(upload_session_id).unwrap();
     let presigned_body = serde_json::json!({
         "session_id": upload_session_id,
         "field": "document",
-        "filename": "test_document.pdf",
-        "content_length": 1024
+        "filename": "testfile.png",
+        "content_length": 270202
     });
     let presigned_response = app
         .post_presigned_upload_url(template_id, &presigned_body)
@@ -474,7 +473,6 @@ async fn init_upload_session_and_get_upload_urls_success() {
         .json::<serde_json::Value>()
         .await
         .expect("Failed to parse JSON response");
+    
     check_response_code_and_message(&presigned_response, 201, "获取预签名上传URL成功");
-
-    dbg!(presigned_response);
 }

@@ -26,6 +26,9 @@ pub enum AppError {
     #[error("未授权访问，请先登录")]
     Unauthorized,
 
+    #[error("{0}")]
+    DatabaseConflictError(String),
+
     #[error("密码错误，请检查您的输入是否正确")]
     PasswordWrong,
 
@@ -63,7 +66,7 @@ impl ResponseError for AppError {
             AppError::ValidationError(_)
             | AppError::BuildSchemaQueryFailed
             | AppError::ValidationMessage(_) => StatusCode::BAD_REQUEST,
-            AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) => StatusCode::CONFLICT,
+            AppError::UserAlreadyExists | AppError::ApiRuleConflict(_) | AppError::DatabaseConflictError(_) => StatusCode::CONFLICT,
             AppError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DataNotChanged => StatusCode::NOT_MODIFIED,
             AppError::DataNotFound(_) => StatusCode::NOT_FOUND,

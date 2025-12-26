@@ -197,7 +197,16 @@ pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(
     )
     .execute(pool)
     .await
-    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    .map_err(|e| {
+        if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
+            if db_code == "23503" {
+                return AppError::DatabaseConflictError(
+                    "存在关联的归档记录，无法删除该模板".to_string(),
+                );
+            }
+        }
+        AppError::UnexpectedError(e.into())
+    })?;
 
     if result.rows_affected() == 0 {
         tracing::warn!("未找到要删除的模板: {}", template_id);
@@ -236,4 +245,26 @@ pub async fn modify_template_status(
     tracing::info!("模板状态已修改: {} -> {}", template_id, is_active);
 
     Ok(())
+}
+
+#[tracing::instrument(name = "检查是否存在关联的归档记录", skip(pool))]
+pub async fn check_any_record_exists(
+    pool: &PgPool,
+    template_id: &uuid::Uuid,
+) -> Result<bool, AppError> {
+    let row = sqlx::query!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+            FROM archive_record
+            WHERE template_id = $1
+        ) as "exists!"
+         "#,
+        template_id
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    Ok(row.exists)
 }

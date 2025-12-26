@@ -10,8 +10,8 @@ use crate::{
             UpdateTemplateRequest,
         },
         service::{
-            create_template, delete_template, modify_template_status, query_templates,
-            update_template,
+            check_any_record_exists, create_template, delete_template, modify_template_status,
+            query_templates, update_template,
         },
     },
 };
@@ -100,7 +100,8 @@ pub async fn query_templates_handler(
         responses(
             (status = 200, description = "更新收集模板成功", body = AppResponse<TemplateDTO>),
             (status = 400, description = "参数校验失败"),
-            (status = 404, description = "模板不存在")
+            (status = 404, description = "模板不存在"),
+            (status = 409, description = "该模板已有归档记录，无法修改"),
         )
     )
 )]
@@ -119,6 +120,12 @@ pub async fn update_template_handler(
         req.0.validate().map_err(AppError::ValidationError)?;
         req.0
     };
+
+    if check_any_record_exists(&app_state.pool, &req.template_id).await? {
+        return Err(AppError::DatabaseConflictError(
+            "该模板已有归档记录，无法修改".to_string(),
+        ));
+    }
 
     let dto = update_template(&app_state.pool, &user.username, req).await?;
 
@@ -139,7 +146,8 @@ pub async fn update_template_handler(
         ),
         responses(
             (status = 200, description = "删除收集模板成功",),
-            (status = 404, description = "模板不存在")
+            (status = 404, description = "模板不存在"),
+            (status = 409, description = "该模板已有归档记录，无法删除"),
         )
     )
 )]

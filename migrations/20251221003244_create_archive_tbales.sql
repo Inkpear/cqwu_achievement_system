@@ -16,7 +16,7 @@ CREATE TABLE
 CREATE TABLE
     archive_record (
         record_id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-        template_id UUID NOT NULL REFERENCES sys_template (template_id) ON DELETE CASCADE,
+        template_id UUID NOT NULL REFERENCES sys_template (template_id) ON DELETE RESTRICT,
         data JSONB NOT NULL,
         created_by UUID REFERENCES sys_user (user_id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),

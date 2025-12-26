@@ -362,24 +362,17 @@ pub async fn try_to_get_field_quota(
     result
 }
 
-#[tracing::instrument(
-    name = "从对象数据库获取上传文件的元数据",
-    skip(s3_storage, session_id, file_id)
-)]
+#[tracing::instrument(name = "从对象数据库获取上传文件的元数据", skip(s3_storage))]
 pub async fn get_file_metadata(
     s3_storage: &S3Storage,
-    session_id: &Uuid,
-    file_id: &Uuid,
+    object_key: &str,
 ) -> Result<FileMetadata, AppError> {
-    let object_key = build_temp_object_key(session_id, file_id);
     let object_head = s3_storage.get_head_object_output(&object_key).await;
     if let Err(e) = object_head {
         match e.into_service_error() {
             HeadObjectError::NotFound(_) => {
-                return Err(AppError::DataNotFound(format!(
-                    "file_id={} 的文件不存在",
-                    file_id
-                )));
+                tracing::warn!("文件不存在: {}", object_key);
+                return Err(AppError::DataNotFound("文件不存在".into()));
             }
             other_error => {
                 return Err(AppError::UnexpectedError(anyhow::anyhow!(
@@ -396,29 +389,26 @@ pub async fn get_file_metadata(
     Ok(file_metadata)
 }
 
-#[tracing::instrument(
-    name = "持久化临时文件至归档存储",
-    skip(s3_storage, session_id, file_id, record_id)
-)]
+#[tracing::instrument(name = "持久化临时文件至归档存储", skip(s3_storage))]
 pub async fn move_temp_file_to_save(
     s3_storage: &S3Storage,
-    session_id: &Uuid,
-    file_id: &Uuid,
-    record_id: &Uuid,
-) -> Result<String, AppError> {
-    let source_key = build_temp_object_key(session_id, file_id);
-    let dest_key = build_archive_dest_key(record_id, file_id);
+    source_key: &str,
+    dest_key: &str,
+) -> Result<(), AppError> {
     s3_storage
         .copy_source_to_dest(&source_key, &dest_key)
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
-
-    Ok(dest_key)
+    s3_storage
+        .delete_object(&source_key)
+        .await
+        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    Ok(())
 }
 
 #[tracing::instrument(
     name = "保存文件元数据至数据库",
-    skip(pool, record_id, file_id, object_key, file_metadata, uploaded)
+    skip(pool, record_id, file_id, object_key, file_metadata, uploaded_by)
 )]
 pub async fn save_file_metadata(
     pool: &mut Transaction<'_, Postgres>,
@@ -426,7 +416,7 @@ pub async fn save_file_metadata(
     file_id: &Uuid,
     object_key: &str,
     file_metadata: &FileMetadata,
-    uploaded: &Uuid,
+    uploaded_by: &Uuid,
 ) -> Result<(), AppError> {
     sqlx::query!(
         r#"
@@ -447,25 +437,11 @@ pub async fn save_file_metadata(
         object_key,
         file_metadata.file_size,
         file_metadata.mime_type,
-        uploaded,
+        uploaded_by,
     )
     .execute(pool.as_mut())
     .await
-    .map_err(|e| {
-        if let Some(db_error) = e.as_database_error().and_then(|db_error| db_error.code()) {
-            match db_error.as_ref() {
-                DatabaseErrorCode::FOREIGN_KEY_VIOLATION => {
-                    AppError::DataNotFound("关联的归档记录不存在".into())
-                }
-                DatabaseErrorCode::UNIQUE_VIOLATION => {
-                    AppError::ValidationMessage("请不要上传重复的文件ID".into())
-                }
-                _ => AppError::UnexpectedError(e.into()),
-            }
-        } else {
-            AppError::UnexpectedError(e.into())
-        }
-    })?;
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     Ok(())
 }
@@ -503,6 +479,7 @@ pub async fn create_files_record(
     record_id: &Uuid,
     file_configs: &SchemaFileFieldConfigs,
     session_id: &Uuid,
+    user_id: &Uuid,
     data: &serde_json::Value,
 ) -> Result<(), AppError> {
     for (field, config) in file_configs.iter() {
@@ -512,7 +489,15 @@ pub async fn create_files_record(
                 check_required(&file_id, config.required, field)?;
                 continue;
             }
-            process_single_file(s3_storage, pool, session_id, &file_id.unwrap(), record_id).await?;
+            process_single_file(
+                s3_storage,
+                pool,
+                session_id,
+                user_id,
+                &file_id.unwrap(),
+                record_id,
+            )
+            .await?;
         } else {
             let file_ids_value = data.get(field);
             let file_ids_array = if let Some(serde_json::Value::Array(arr)) = file_ids_value {
@@ -521,20 +506,36 @@ pub async fn create_files_record(
                 check_required(&None, config.required, field)?;
                 continue;
             };
-            let mut file_ids = Vec::new();
-            for file_id_value in file_ids_array {
-                let file_id = try_parse_file_id(&Some(file_id_value));
-                if file_id.is_none() {
-                    continue;
-                }
-                file_ids.push(file_id.unwrap());
+            let file_ids: Vec<Uuid> = file_ids_array
+                .iter()
+                .map(|val| {
+                    try_parse_file_id(&Some(val)).ok_or_else(|| {
+                        AppError::ValidationMessage(format!(
+                            "字段 {} 包含无效文件ID: {:?}",
+                            field, val
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<Uuid>, AppError>>()?;
+
+            if file_ids.is_empty() && config.required {
+                return Err(AppError::ValidationMessage(format!(
+                    "字段 {} 不能为空",
+                    field
+                )));
             }
-            if file_ids.is_empty() {
-                check_required(&None, config.required, field)?;
-                continue;
+            let mut unique_ids = HashSet::new();
+            for id in &file_ids {
+                if !unique_ids.insert(id) {
+                    return Err(AppError::ValidationMessage(format!(
+                        "字段 {} 包含重复文件ID: {}",
+                        field, id
+                    )));
+                }
             }
             for file_id in file_ids {
-                process_single_file(s3_storage, pool, session_id, &file_id, record_id).await?;
+                process_single_file(s3_storage, pool, session_id, user_id, &file_id, record_id)
+                    .await?;
             }
         }
     }
@@ -570,21 +571,25 @@ async fn process_single_file(
     s3_storage: &S3Storage,
     pool: &mut Transaction<'_, Postgres>,
     session_id: &Uuid,
+    user_id: &Uuid,
     file_id: &Uuid,
     record_id: &Uuid,
 ) -> Result<String, AppError> {
-    let file_metadata = get_file_metadata(s3_storage, session_id, &file_id).await?;
-    let object_key = move_temp_file_to_save(s3_storage, session_id, &file_id, record_id).await?;
+    let source_key = build_temp_object_key(session_id, file_id);
+    let dest_key = build_archive_dest_key(record_id, file_id);
+    let file_metadata = get_file_metadata(s3_storage, &source_key).await?;
     save_file_metadata(
         pool,
         record_id,
         &file_id,
-        &object_key,
+        &dest_key,
         &file_metadata,
-        session_id,
+        user_id,
     )
     .await?;
-    Ok(object_key)
+    move_temp_file_to_save(s3_storage, &source_key, &dest_key).await?;
+
+    Ok(source_key)
 }
 
 #[tracing::instrument(name = "生成文件预览链接", skip(s3_storage, object_key, filename))]
@@ -707,6 +712,6 @@ fn replace_uuid_with_url_in_json(val: &mut serde_json::Value, url_map: &HashMap<
                 replace_uuid_with_url_in_json(item, url_map);
             }
         }
-        _ => ()
+        _ => (),
     }
 }

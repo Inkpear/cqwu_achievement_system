@@ -1,6 +1,8 @@
 use uuid::Uuid;
 
-use crate::helper::{TestApp, TestUser, check_response_code_and_message};
+use crate::helper::{
+    TestApp, TestUser, check_response_code_and_message, generate_a_dummy_file_content,
+};
 
 #[tokio::test]
 async fn create_archive_and_query_success() {
@@ -400,7 +402,7 @@ async fn create_a_file_template_and_query_it_success() {
 }
 
 #[tokio::test]
-async fn init_upload_session_and_get_upload_urls_success() {
+async fn init_upload_session_and_get_upload_urls_success_and_get_again_returns_403() {
     let mut app = TestApp::spawn().await;
     let user = TestUser::default_admin(&app.db_pool).await;
     app.login(&user).await;
@@ -473,6 +475,208 @@ async fn init_upload_session_and_get_upload_urls_success() {
         .json::<serde_json::Value>()
         .await
         .expect("Failed to parse JSON response");
-    
+
     check_response_code_and_message(&presigned_response, 201, "获取预签名上传URL成功");
+
+    let presigned_body_2 = serde_json::json!({
+        "session_id": upload_session_id,
+        "field": "document",
+        "filename": "testfile2.png",
+        "content_length": 270202
+    });
+    let presigned_response_2 = app
+        .post_presigned_upload_url(template_id, &presigned_body_2)
+        .await;
+    assert_eq!(presigned_response_2.status().as_u16(), 403);
+    let presigned_response_2 = presigned_response_2
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&presigned_response_2, 403, "该字段配额已用完");
+}
+
+#[tokio::test]
+async fn create_a_file_record_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "文件归档模板",
+        "category": "文件收集",
+        "description": "用于收集文件的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" }
+                },
+                "required": ["title"]
+            }
+        },
+        "schema_files": [
+            {
+                "field": "attachment",
+                "title": "附件文件",
+                "file_config": {
+                    "allowed_types": [".pdf", ".txt"],
+                    "quota": 2,
+                    "max_size": 1048576,
+                    "required": true,
+                }
+            }
+        ]
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+    let template_id_uuid = Uuid::parse_str(template_id).unwrap();
+
+    let exists = sqlx::query!(
+        "SELECT 1 as exists FROM sys_template WHERE template_id = $1",
+        template_id_uuid
+    )
+    .fetch_optional(&app.db_pool)
+    .await
+    .unwrap();
+
+    assert!(exists.is_some(), "模板在提交前就应该存在于数据库中！");
+
+    let init_res = app.get_init_upload_session(template_id).await;
+    let init_res = init_res.json::<serde_json::Value>().await.unwrap();
+
+    check_response_code_and_message(&init_res, 201, "初始化上传会话成功");
+
+    let session_id = init_res["data"].as_str().unwrap();
+    let session_id = Uuid::parse_str(session_id).unwrap();
+    let dummy_file_content = generate_a_dummy_file_content(512 * 1024);
+    let filename = "report.pdf";
+    let content_type = mime_guess::from_path(filename)
+        .first_or_octet_stream()
+        .essence_str()
+        .to_string();
+
+    let presigned_body = serde_json::json!({
+        "session_id": session_id,
+        "field": "attachment",
+        "filename": filename,
+        "content_length": dummy_file_content.len() as i64,
+    });
+
+    let presigned_res = app
+        .post_presigned_upload_url(template_id, &presigned_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+
+    let upload_url = presigned_res["data"]["url"].as_str().unwrap();
+    let file_id = presigned_res["data"]["file_id"].as_str().unwrap();
+    let upload_res = app
+        .put_to_upload_file(upload_url, &dummy_file_content, &content_type, filename)
+        .await;
+
+    assert_eq!(upload_res.status().as_u16(), 200);
+    let record_body = serde_json::json!({
+        "data": {
+            "title": "文件归档示例",
+            "attachment": [file_id]
+        },
+        "session_id": session_id
+    });
+    let record_res = app
+        .post_create_archive_record(template_id, &record_body)
+        .await
+        .json()
+        .await
+        .unwrap();
+    check_response_code_and_message(&record_res, 201, "创建归档记录成功");
+
+    let file_url = record_res["data"]["data"]["attachment"][0]
+        .as_str()
+        .unwrap();
+
+    let view_url_res = reqwest::Client::new()
+        .get(file_url)
+        .send()
+        .await
+        .expect("Failed to send GET request to view file");
+    assert_eq!(view_url_res.status().as_u16(), 200);
+
+    let file_name = view_url_res
+        .headers()
+        .get("content-disposition")
+        .expect("Missing Content-Disposition header")
+        .to_str()
+        .expect("Failed to convert header value to str");
+    assert!(file_name.contains("report.pdf"));
+
+    let content = view_url_res
+        .bytes()
+        .await
+        .expect("Failed to read file content");
+    assert_eq!(content, dummy_file_content);
+}
+
+#[tokio::test]
+async fn create_a_file_record_fail_with_a_random_file_id() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "文件归档模板",
+        "category": "文件收集",
+        "description": "用于收集文件的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" }
+                },
+                "required": ["title"]
+            }
+        },
+        "schema_files": [
+            {
+                "field": "attachment",
+                "title": "附件文件",
+                "file_config": {
+                    "allowed_types": [".pdf", ".txt"],
+                    "quota": 2,
+                    "max_size": 1048576,
+                    "required": true,
+                }
+            }
+        ]
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let record_body = serde_json::json!({
+        "data": {
+            "title": "文件归档示例",
+            "attachment": [Uuid::new_v4().to_string()]
+        }
+    });
+    let record_res = app
+        .post_create_archive_record(template_id, &record_body)
+        .await
+        .json()
+        .await
+        .unwrap();
+    check_response_code_and_message(&record_res, 400, "请上传必要的文件");
 }

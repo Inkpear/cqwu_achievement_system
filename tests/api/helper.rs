@@ -10,6 +10,7 @@ use cqwu_achievement_system::{
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
 };
+use rand::{Rng, distr::Alphanumeric};
 use reqwest::header::HeaderMap;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -305,10 +306,7 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn get_init_upload_session(
-        &self,
-        template_id: &str,
-    ) -> reqwest::Response {
+    pub async fn get_init_upload_session(&self, template_id: &str) -> reqwest::Response {
         self.api_client
             .get(&format!(
                 "{}/api/archive/{}/init_upload",
@@ -330,6 +328,24 @@ impl TestApp {
                 self.address, template_id
             ))
             .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn put_to_upload_file(
+        &self,
+        upload_url: &str,
+        file_content: &Vec<u8>,
+        content_type: &str,
+        filename: &str,
+    ) -> reqwest::Response {
+        let filename = urlencoding::encode(filename);
+        reqwest::Client::new()
+            .put(upload_url)
+            .header("Content-Type", content_type)
+            .header("x-amz-meta-original-filename", filename.as_ref())
+            .body(file_content.clone())
             .send()
             .await
             .expect("Failed to execute request")
@@ -444,4 +460,12 @@ pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, 
         msg,
         response
     );
+}
+
+pub fn generate_a_dummy_file_content(file_size: usize) -> Vec<u8> {
+    let mut rng = rand::rng();
+    let content: String = (0..file_size)
+        .map(|_| rng.sample(Alphanumeric) as char)
+        .collect();
+    content.into_bytes()
 }

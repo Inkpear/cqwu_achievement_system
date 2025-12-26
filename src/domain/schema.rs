@@ -84,7 +84,7 @@ impl SchemaFileFieldConfig {
             );
         }
         field_def.insert("title".to_string(), Value::String(title.to_string()));
-        
+
         if self.required {
             let required_array = schema
                 .as_object_mut()
@@ -110,7 +110,7 @@ impl SchemaFileFieldConfig {
         let max_size = x_config.get("max_size")?.as_i64()?;
         let quota = match field_def.get("type")?.as_str()? {
             "string" if field_def.get("format") == Some(&Value::String("file-id".to_string())) => 1,
-            "array" => field_def.get("max_items")?.as_u64()?,
+            "array" => field_def.get("maxItems")?.as_u64()?,
             _ => return None,
         };
         Some(SchemaFileFieldConfig {

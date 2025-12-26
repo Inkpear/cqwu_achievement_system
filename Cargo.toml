@@ -56,3 +56,4 @@ features = [
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }
+rand = "0.9"

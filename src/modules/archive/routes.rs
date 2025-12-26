@@ -17,7 +17,10 @@ use crate::{
 };
 
 #[cfg(feature = "swagger")]
-use crate::{common::pagination::PageData, modules::archive::models::{ArchiveRecordDTO, PresignedResponse}};
+use crate::{
+    common::pagination::PageData,
+    modules::archive::models::{ArchiveRecordDTO, PresignedResponse},
+};
 
 #[cfg_attr(feature = "swagger", utoipa::path(
     post,
@@ -77,6 +80,7 @@ pub async fn create_archive_record_handler(
             &record.record_id,
             schema_context.file_field_configs.as_ref().unwrap(),
             req.session_id.as_ref().unwrap(),
+            &user.sub,
             &req.data,
         )
         .await?;

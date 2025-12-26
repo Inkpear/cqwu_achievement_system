@@ -148,7 +148,7 @@ pub async fn query_archive_records_handler(
 #[cfg_attr(
     feature = "swagger",
     utoipa::path(
-        post,
+        get,
         path = "/api/archive/{template_id}/init_upload",
         tag = "归档记录管理",
         security(

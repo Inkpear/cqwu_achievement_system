@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use crate::helper::{TestApp, TestUser, check_response_code_and_message};
 
 #[tokio::test]
@@ -366,9 +368,7 @@ async fn create_a_file_template_and_query_it_success() {
         ]
     });
 
-    let response = app
-        .post_create_template(&body)
-        .await;
+    let response = app.post_create_template(&body).await;
     assert_eq!(response.status().as_u16(), 201);
 
     let response = response
@@ -397,4 +397,84 @@ async fn create_a_file_template_and_query_it_success() {
     assert_eq!(prop["head"]["maxItems"], 2);
     assert_eq!(prop["head"]["title"], "用户头像");
     // dbg!(query_response);
+}
+
+#[tokio::test]
+async fn init_upload_session_and_get_upload_urls_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let body = serde_json::json!({
+        "name": "文件上传模板",
+        "category": "文件收集",
+        "description": "用于收集文件的模板",
+        "schema": {
+            "schema_def": {
+                "name": "文件信息定义",
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" }
+                }
+            }
+        },
+        "schema_files": [
+            {
+                "field": "document",
+                "title": "文档文件",
+                "file_config": {
+                    "allowed_types": [".docx", ".pdf"],
+                    "quota": 1,
+                    "max_size": 2097152,
+                    "required": true,
+                }
+            }
+        ]
+    });
+
+    let response = app.post_create_template(&body).await;
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    let template_id = response["data"]["template_id"]
+        .as_str()
+        .expect("template_id should be a string");
+
+    let init_response = app.get_init_upload_session(template_id).await;
+    assert_eq!(init_response.status().as_u16(), 201);
+
+    let init_response = init_response
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&init_response, 201, "初始化上传会话成功");
+
+    let upload_session_id = init_response["data"]
+        .as_str()
+        .expect("upload_session_id should be a string");
+    assert!(!upload_session_id.is_empty());
+    // dbg!(upload_session_id);
+    let upload_session_id = Uuid::parse_str(upload_session_id).unwrap();
+    let presigned_body = serde_json::json!({
+        "session_id": upload_session_id,
+        "field": "document",
+        "filename": "test_document.pdf",
+        "content_length": 1024
+    });
+    let presigned_response = app
+        .post_presigned_upload_url(template_id, &presigned_body)
+        .await;
+    assert_eq!(presigned_response.status().as_u16(), 201);
+    let presigned_response = presigned_response
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&presigned_response, 201, "获取预签名上传URL成功");
+
+    dbg!(presigned_response);
 }

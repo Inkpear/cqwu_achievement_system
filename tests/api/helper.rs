@@ -304,6 +304,36 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn get_init_upload_session(
+        &self,
+        template_id: &str,
+    ) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/archive/{}/init_upload",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_presigned_upload_url(
+        &self,
+        template_id: &str,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!(
+                "{}/api/archive/{}/presigned",
+                self.address, template_id
+            ))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

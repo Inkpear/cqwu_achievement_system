@@ -15,7 +15,7 @@ pub fn config(cfg: &mut actix_web::web::ServiceConfig) {
             )
             .route(
                 "/{template_id}/init_upload",
-                actix_web::web::post().to(routes::init_upload_session_handler),
+                actix_web::web::get().to(routes::init_upload_session_handler),
             )
             .route(
                 "/{template_id}/presigned",

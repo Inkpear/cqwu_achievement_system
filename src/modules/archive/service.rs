@@ -635,7 +635,7 @@ pub async fn enrich_archive_records_with_urls(
             }
         }
     }
-
+    
     if file_ids_to_fetch.is_empty() {
         return Ok(());
     }
@@ -679,6 +679,55 @@ pub async fn enrich_archive_records_with_urls(
         }
     }
 
+    Ok(())
+}
+
+#[tracing::instrument(name = "通过记录ID删除归档记录", skip(pool, s3_storage, record_id))]
+pub async fn delete_archive_record_by_id(
+    pool: &mut Transaction<'_, Postgres>,
+    s3_storage: &S3Storage,
+    record_id: &Uuid,
+) -> Result<(), AppError> {
+    let object_keys = sqlx::query!(
+        r#"
+        SELECT object_key
+        FROM sys_file
+        WHERE record_id = $1
+        "#,
+        record_id
+    )
+    .fetch_all(pool.as_mut())
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    let row = sqlx::query!(
+        r#"
+        DELETE FROM archive_record
+        WHERE record_id = $1
+        "#,
+        record_id
+    )
+    .execute(pool.as_mut())
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if row.rows_affected() == 0 {
+        tracing::warn!("未找到要删除的归档记录: {}", record_id);
+        return Err(AppError::DataNotFound("归档记录不存在".into()));
+    }
+
+    let object_keys = object_keys
+        .into_iter()
+        .map(|row| row.object_key)
+        .collect::<Vec<String>>();
+
+    for object_key in object_keys {
+        s3_storage
+            .delete_object(&object_key)
+            .await
+            .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    }
+
+    tracing::info!("归档记录已删除: {}", record_id);
     Ok(())
 }
 

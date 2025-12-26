@@ -20,6 +20,10 @@ pub fn config(cfg: &mut actix_web::web::ServiceConfig) {
             .route(
                 "/{template_id}/presigned",
                 actix_web::web::post().to(routes::presigned_upload_url_handler),
+            )
+            .route(
+                "/{record_id}/delete",
+                actix_web::web::delete().to(routes::delete_archive_record_handler),
             ),
     );
 }

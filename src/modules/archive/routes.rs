@@ -9,9 +9,9 @@ use crate::{
         models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
         service::{
             check_file_validity, check_need_file, create_archive_record, create_files_record,
-            enrich_archive_records_with_urls, get_or_load_template_context, init_upload_session,
-            presigned_upload_url, query_archive_records, try_to_get_field_quota,
-            validate_instance_by_id,
+            delete_archive_record_by_id, enrich_archive_records_with_urls,
+            get_or_load_template_context, init_upload_session, presigned_upload_url,
+            query_archive_records, try_to_get_field_quota, validate_instance_by_id,
         },
     },
 };
@@ -85,9 +85,11 @@ pub async fn create_archive_record_handler(
         )
         .await?;
     }
+
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
     let record = if has_files {
         let mut record_vec = vec![record];
         enrich_archive_records_with_urls(
@@ -225,6 +227,12 @@ pub async fn init_upload_session_handler(
         template_id = %template_id,
     )
 )]
+#[tracing::instrument(name = "获取预签名上传URL", skip(app_state, req, template_id, user)
+    fields(
+        user_id = %user.sub,
+        template_id = %template_id,
+    )
+)]
 pub async fn presigned_upload_url_handler(
     app_state: web::Data<AppState>,
     req: web::Json<PreSignedRequests>,
@@ -256,4 +264,48 @@ pub async fn presigned_upload_url_handler(
     .await?;
 
     Ok(AppResponse::created(presigned_url, "获取预签名上传URL成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        delete,
+        path = "/api/archive/record/{record_id}/delete",
+        tag = "归档记录管理",
+        params(
+            ("record_id" = uuid::Uuid, Path, description = "归档记录ID")
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "删除归档记录成功",),
+            (status = 404, description = "归档记录不存在"),
+        )
+    )
+)]
+#[tracing::instrument(
+    name = "删除归档记录",
+    skip(app_state, record_id),
+    fields(
+        record_id = %record_id
+    )
+)]
+pub async fn delete_archive_record_handler(
+    app_state: web::Data<AppState>,
+    record_id: web::Path<Uuid>,
+) -> Result<impl Responder, AppError> {
+    let mut tx = app_state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    delete_archive_record_by_id(&mut tx, &app_state.s3_storage, &record_id).await?;
+
+    tx.commit()
+        .await
+        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    Ok(AppResponse::ok_msg("删除归档记录成功"))
 }

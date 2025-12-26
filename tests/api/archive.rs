@@ -495,12 +495,7 @@ async fn init_upload_session_and_get_upload_urls_success_and_get_again_returns_4
     check_response_code_and_message(&presigned_response_2, 403, "该字段配额已用完");
 }
 
-#[tokio::test]
-async fn create_a_file_record_success() {
-    let mut app = TestApp::spawn().await;
-    let user = TestUser::default_admin(&app.db_pool).await;
-    app.login(&user).await;
-
+async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
     let template_body = serde_json::json!({
         "name": "文件归档模板",
         "category": "文件收集",
@@ -622,6 +617,20 @@ async fn create_a_file_record_success() {
         .await
         .expect("Failed to read file content");
     assert_eq!(content, dummy_file_content);
+    
+    record_res["data"]["record_id"]
+        .as_str()
+        .and_then(|id_str| Uuid::parse_str(id_str).ok())
+        .expect("record_id should be a valid UUID")
+}
+
+#[tokio::test]
+async fn create_a_file_record_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    create_a_file_record_return_record_id(&mut app).await;
 }
 
 #[tokio::test]
@@ -679,4 +688,21 @@ async fn create_a_file_record_fail_with_a_random_file_id() {
         .await
         .unwrap();
     check_response_code_and_message(&record_res, 400, "请上传必要的文件");
+}
+
+#[tokio::test]
+async fn create_a_file_record_and_delete_it_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let record_id = create_a_file_record_return_record_id(&mut app).await;
+
+    let delete_res = app
+        .delete_archive_record(&record_id.to_string())
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&delete_res, 200, "删除归档记录成功");
 }

@@ -350,6 +350,17 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn delete_archive_record(&self, record_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/archive/{}/delete",
+                self.address, record_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

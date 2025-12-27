@@ -282,7 +282,7 @@ pub async fn presigned_upload_url_handler(
     feature = "swagger",
     utoipa::path(
         delete,
-        path = "/api/archive/record/{record_id}/delete",
+        path = "/api/archive/{record_id}/delete",
         tag = "归档记录管理",
         params(
             ("record_id" = uuid::Uuid, Path, description = "归档记录ID")

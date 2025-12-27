@@ -5,15 +5,19 @@ use validator::Validate;
 use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
     middleware::auth::AuthenticatedUser,
-    modules::{admin::template::service::check_template_is_enabled, archive::{
-        models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
-        service::{
-            check_file_validity, check_need_file, create_archive_record, create_files_record,
-            delete_archive_record_by_id, enrich_archive_records_with_urls,
-            get_or_load_template_context, init_upload_session, presigned_upload_url,
-            query_archive_records, try_to_get_field_quota, validate_instance_by_id,
+    modules::{
+        admin::template::service::check_template_is_enabled,
+        archive::{
+            models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
+            service::{
+                check_file_validity, check_need_file, check_session_exists_and_delete_it,
+                create_archive_record, create_files_record, delete_archive_record_by_id,
+                enrich_archive_records_with_urls, get_or_load_template_context,
+                init_upload_session, presigned_upload_url, query_archive_records,
+                try_to_get_field_quota, validate_instance_by_id,
+            },
         },
-    }},
+    },
 };
 
 #[cfg(feature = "swagger")]
@@ -51,7 +55,6 @@ pub async fn create_archive_record_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     check_template_is_enabled(&app_state.pool, &template_id).await?;
-
     validate_instance_by_id(
         &app_state.pool,
         &app_state.schema_cache,
@@ -76,6 +79,11 @@ pub async fn create_archive_record_handler(
     let has_files = schema_context.file_field_configs.is_some() && req.session_id.is_some();
 
     if has_files {
+        check_session_exists_and_delete_it(
+            &app_state.redis_cache,
+            req.session_id.as_ref().unwrap(),
+        )
+        .await?;
         create_files_record(
             &app_state.s3_storage,
             &mut tx,

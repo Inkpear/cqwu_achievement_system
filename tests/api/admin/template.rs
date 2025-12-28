@@ -712,3 +712,60 @@ async fn get_all_template_categories() {
     assert!(categories.iter().any(|c| c.as_str().unwrap() == "分类X"));
     assert!(categories.iter().any(|c| c.as_str().unwrap() == "分类Y"));
 }
+
+#[tokio::test]
+async fn a_template_can_not_be_deleted_when_it_is_referenced_by_archives() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "关联归档模板",
+        "category": "测试",
+        "description": "用于测试删除时的外键约束",
+        "schema": {
+            "schema_def": {
+                "type": "object"
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let archive_body = serde_json::json!({
+        "data": {
+            "field1": "一些数据"
+        }
+    });
+
+    let record_response = app
+        .post_create_archive_record(&template_id, &archive_body)
+        .await
+        .json()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&record_response, 201, "创建归档记录成功");
+
+    let delete_response = app
+        .delete_template(&template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&delete_response, 409, "存在关联的归档记录，无法删除该模板");
+}

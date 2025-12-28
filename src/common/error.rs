@@ -120,6 +120,9 @@ impl DatabaseErrorCode {
     /// 外键约束违反 (Foreign Key Violation)
     pub const FOREIGN_KEY_VIOLATION: &'static str = "23503";
 
+    /// 限制约束违反 (删除/更新父表时)
+    pub const RESTRICT_VIOLATION: &'static str = "23001";
+
     /// 非空约束违反 (Not Null Violation)
     pub const NOT_NULL_VIOLATION: &'static str = "23502";
 

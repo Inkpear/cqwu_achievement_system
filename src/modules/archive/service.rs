@@ -682,10 +682,7 @@ pub async fn enrich_archive_records_with_urls(
     Ok(())
 }
 
-#[tracing::instrument(
-    name = "检查上传会话是否存在并移除",
-    skip(redis_cache, session_id)
-)]
+#[tracing::instrument(name = "检查上传会话是否存在并移除", skip(redis_cache, session_id))]
 pub async fn check_session_exists_and_delete_it(
     redis_cache: &RedisCache,
     session_id: &Uuid,

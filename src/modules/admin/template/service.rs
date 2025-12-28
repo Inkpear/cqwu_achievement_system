@@ -292,7 +292,7 @@ pub async fn check_template_is_enabled(
         Some(record) => {
             if !record.is_active {
                 tracing::warn!("模板 {} 已被禁用", template_id);
-                return Err(AppError::DataNotFound("关联的模板不存在".into()));
+                return Err(AppError::Forbidden("关联的模板已经被禁用".into()));
             }
             Ok(())
         }

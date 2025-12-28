@@ -1230,3 +1230,72 @@ async fn create_a_record_fail_with_fake_session_id() {
         .unwrap();
     check_response_code_and_message(&record_res, 404, "上传会话不存在或已过期");
 }
+
+#[tokio::test]
+async fn create_a_record_and_fuzzy_query_success() {
+    let mut app = TestApp::spawn().await;
+    let admin_user = TestUser::default_admin(&app.db_pool).await;
+    let mut normal_user = TestUser::new();
+    normal_user.store(&app.db_pool).await;
+
+    app.login(&admin_user).await;
+
+    let template_body = serde_json::json!({
+        "name": "模糊查询测试模板",
+        "category": "测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "content": { "type": "string"}
+                },
+                "required": ["title"]
+            }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+    let body = serde_json::json!({
+        "data": {
+            "title": "测试记录标题",
+            "content": "这是用于模糊查询测试的内容字段"
+        }
+    });
+    let record_res = app
+        .post_create_archive_record(template_id, &body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&record_res, 201, "创建归档记录成功");
+
+    let record_id = record_res["data"]["record_id"].as_str().unwrap();
+
+    let query_body = serde_json::json!({
+        "filters": [
+            { "field": "content", "operator": "LIKE", "value": "模糊查询" },
+            { "field": "title", "operator": "LIKE", "value": "测试" }
+        ]
+    });
+    let query_res = app
+        .post_query_archive_records(&template_id.to_string(), &query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&query_res, 200, "查询归档记录成功");
+    let items = query_res["data"]["items"].as_array().unwrap();
+
+    assert_eq!(
+        items[0]["record_id"].as_str().unwrap(),
+        record_id,
+        "模糊查询结果应包含创建的记录"
+    );
+}

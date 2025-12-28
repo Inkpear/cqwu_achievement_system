@@ -486,8 +486,5 @@ pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, 
 
 pub fn generate_a_dummy_file_content(file_size: usize) -> Vec<u8> {
     let mut rng = rand::rng();
-    let content: String = (0..file_size)
-        .map(|_| rng.sample(Alphanumeric) as char)
-        .collect();
-    content.into_bytes()
+    vec![rng.sample(Alphanumeric); file_size]
 }

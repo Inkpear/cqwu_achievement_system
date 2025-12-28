@@ -77,7 +77,7 @@ pub fn build_where_clause<'a>(
                 query_builder.push("archive_record.data ->> ");
                 query_builder.push_bind(&schema_filter.field);
                 query_builder.push(" ILIKE ");
-                query_builder.push_bind(&schema_filter.value);
+                query_builder.push_bind(format!("%{}%", schema_filter.value));
             }
         }
     }

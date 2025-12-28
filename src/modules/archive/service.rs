@@ -371,8 +371,8 @@ pub async fn get_file_metadata(
     if let Err(e) = object_head {
         match e.into_service_error() {
             HeadObjectError::NotFound(_) => {
-                tracing::warn!("文件不存在: {}", object_key);
-                return Err(AppError::DataNotFound("文件不存在".into()));
+                tracing::warn!("无效的文件ID: {}", object_key);
+                return Err(AppError::DataNotFound("存在无效的文件ID".into()));
             }
             other_error => {
                 return Err(AppError::UnexpectedError(anyhow::anyhow!(
@@ -545,7 +545,7 @@ pub async fn create_files_record(
 fn check_required(file_id: &Option<Uuid>, required: bool, field: &str) -> Result<(), AppError> {
     if required && file_id.is_none() {
         return Err(AppError::ValidationMessage(format!(
-            "{}需要上传文件",
+            "{} 需一个合法的文件ID",
             field
         )));
     }
@@ -679,6 +679,29 @@ pub async fn enrich_archive_records_with_urls(
         }
     }
 
+    Ok(())
+}
+
+#[tracing::instrument(
+    name = "检查上传会话是否存在并移除",
+    skip(redis_cache, session_id)
+)]
+pub async fn check_session_exists_and_delete_it(
+    redis_cache: &RedisCache,
+    session_id: &Uuid,
+) -> Result<(), AppError> {
+    let session_key = build_upload_session_key(session_id);
+    let exists = redis_cache
+        .exists(&session_key)
+        .await
+        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    if !exists {
+        return Err(AppError::DataNotFound("上传会话不存在或已过期".into()));
+    }
+    redis_cache
+        .del(&session_key)
+        .await
+        .map_err(|e| AppError::UnexpectedError(e.into()))?;
     Ok(())
 }
 

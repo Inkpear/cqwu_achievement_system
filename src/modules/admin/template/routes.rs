@@ -190,7 +190,7 @@ pub async fn modify_template_status_handler(
 
 #[cfg_attr(feature = "swagger", utoipa::path(
     get,
-    path = "/api/admin/template/categories",
+    path = "/api/admin/template/all_categories",
     tag = "管理员-模板管理",
     security(
         ("bearer_auth" = [])

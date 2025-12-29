@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::helper::{TestApp, TestUser, check_response_code_and_message};
 
 #[tokio::test]
-async fn admin_grant_user_create_user_api_rule_and_user_can_create_user() {
+async fn admin_grant_user_create_template_api_rule_and_user_can_create_template() {
     let mut app = TestApp::spawn().await;
 
     let admin = TestUser::default_admin(&app.db_pool).await;
@@ -61,7 +61,7 @@ async fn grant_api_rule_fail_when_rule_conflict() {
 
     let body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
-        "api_pattern": "/api/user/",
+        "api_pattern": "/api/admin/user/",
         "http_method": "ALL",
         "expires_at": null
     });
@@ -81,8 +81,8 @@ async fn grant_api_rule_fail_when_rule_conflict() {
 
     let conflicting_body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
-        "api_pattern": "/api/user/profile/",
-        "http_method": "GET",
+        "api_pattern": "/api/admin/user/create/",
+        "http_method": "POST",
         "expires_at": null
     });
 
@@ -114,12 +114,13 @@ async fn grant_same_rule_success_when_expires_is_longer() {
     let mut user = TestUser::new();
     user.store(&app.db_pool).await;
     assert!(user.user_id.is_some());
+    let now = chrono::Utc::now();
 
     let body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
-        "api_pattern": "/api/user/profile/",
-        "http_method": "GET",
-        "expires_at": "2026-12-31T23:59:59Z"
+        "api_pattern": "/api/admin/user/create/",
+        "http_method": "POST",
+        "expires_at": (now + chrono::Duration::days(30)).to_rfc3339(),
     });
 
     let response = app
@@ -137,9 +138,9 @@ async fn grant_same_rule_success_when_expires_is_longer() {
 
     let extended_body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
-        "api_pattern": "/api/user/profile/",
-        "http_method": "GET",
-        "expires_at": "2027-12-31T23:59:59Z"
+        "api_pattern": "/api/admin/user/create/",
+        "http_method": "POST",
+        "expires_at": (now + chrono::Duration::days(60)).to_rfc3339(),
     });
 
     let response = app
@@ -197,8 +198,8 @@ async fn revoke_exists_rule_success_and_not_exists_returns_404() {
 
     let body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
-        "api_pattern": "/api/user/profile/",
-        "http_method": "GET",
+        "api_pattern": "/api/admin/user/create/",
+        "http_method": "POST",
         "expires_at": null
     });
 
@@ -243,11 +244,53 @@ async fn grant_api_rule_and_query_success() {
     user.store(&app.db_pool).await;
     assert!(user.user_id.is_some());
 
+    let mut template_ids = vec![];
     for i in 1..=15 {
+        let template_body = serde_json::json!({
+            "name": format!("测试模板{}", i),
+            "category": "测试分类",
+            "description": "用于测试的收集模板",
+            "schema": {
+                "schema_def": {
+                    "title": "测试模板",
+                    "type": "object",
+                    "properties": {
+                        "field1": {
+                            "type": "string",
+                            "title": "字段1"
+                        },
+                        "field2": {
+                            "type": "number",
+                            "title": "字段2"
+                        }
+                    },
+                    "required": ["field1", "field2"]
+                }
+            }
+        });
+
+        let response = app
+            .post_create_template(&template_body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+
+        check_response_code_and_message(&response, 201, "收集模板创建成功");
+
+        let template_id = response["data"]
+            .get("template_id")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        template_ids.push(template_id.to_string());
+    }
+
+    for template_id in template_ids {
         let body = serde_json::json!({
             "user_id": user.user_id.unwrap().to_string(),
-            "api_pattern": format!("/api/test/endpoint_{}/", ('a' as u8 + i) as char),
-            "http_method": "GET",
+            "api_pattern": format!("/api/archive/{}/query/", template_id),
+            "http_method": "POST",
             "expires_at": null
         });
 

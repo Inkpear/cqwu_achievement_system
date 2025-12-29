@@ -84,3 +84,11 @@ pub struct ApiRuleDTO {
     #[cfg_attr(feature = "swagger", schema(example = "系统管理员"))]
     pub granted_by: Option<Uuid>,
 }
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Deserialize)]
+pub struct RoutesFilter {
+    #[cfg_attr(feature = "swagger", schema(example = "/api/admin/user/"))]
+    pub prefix: Option<String>,
+    pub method: Option<HttpMethod>,
+}

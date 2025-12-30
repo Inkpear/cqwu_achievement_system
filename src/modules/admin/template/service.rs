@@ -1,10 +1,7 @@
 use sqlx::PgPool;
 
 use crate::{
-    common::{
-        error::{AppError, DatabaseErrorCode},
-        pagination::PageData,
-    },
+    common::{error::AppError, pagination::PageData},
     domain::SchemaFileDefinition,
     modules::admin::template::models::{
         CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO, UpdateTemplateRequest,
@@ -200,16 +197,7 @@ pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
-            if db_code == DatabaseErrorCode::RESTRICT_VIOLATION {
-                return AppError::DatabaseConflictError(
-                    "存在关联的归档记录，无法删除该模板".to_string(),
-                );
-            }
-        }
-        AppError::UnexpectedError(e.into())
-    })?;
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     if result.rows_affected() == 0 {
         tracing::warn!("未找到要删除的模板: {}", template_id);

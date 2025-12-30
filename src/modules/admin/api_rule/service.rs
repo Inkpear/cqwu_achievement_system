@@ -246,7 +246,7 @@ pub async fn do_filter_with_user_exists_rules(
 ) -> Result<(), AppError> {
     let user_rules = get_effective_rules_for_user(pool, user_id).await?;
     routes.retain(|route| {
-        user_rules.iter().any(|(pattern, method)| {
+        user_rules.iter().all(|(pattern, method)| {
             !route.path.starts_with(pattern)
                 || (route.method != *method && *method != HttpMethod::ALL)
         })

@@ -1,8 +1,10 @@
 use crate::common::pagination::{default_page, default_page_size};
 use crate::domain::UserRole;
+use crate::modules::user::models::PHONE_NUMBER;
 use chrono::{DateTime, Utc};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "swagger")]
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -36,7 +38,7 @@ pub struct RegisterUserRequest {
     pub email: Option<String>,
 
     #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
-    #[validate(length(min = 11, max = 11, message = "电话号码长度必须为11个字符"))]
+    #[validate(regex(path = "PHONE_NUMBER", message = "请提供合法的中国大陆手机号"))]
     pub phone: Option<String>,
 
     #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]

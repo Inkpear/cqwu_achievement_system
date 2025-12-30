@@ -40,6 +40,10 @@ static PHOTO_NAME: LazyLock<regex::Regex> = LazyLock::new(|| {
         .expect("Failed to compile photo_name regex")
 });
 
+pub static PHONE_NUMBER: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"^1[3-9]\d{9}$").expect("Failed to compile phone_number regex")
+});
+
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 #[derive(Deserialize, Validate)]
 pub struct PresignedAvatarUrlRequest {
@@ -74,7 +78,7 @@ pub struct UpdateUserInfoRequest {
     pub email: Option<String>,
 
     #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
-    #[validate(length(min = 11, max = 11, message = "电话号码长度必须为11个字符"))]
+    #[validate(regex(path = "PHONE_NUMBER", message = "请提供合法的中国大陆手机号"))]
     pub phone: Option<String>,
 }
 
@@ -83,18 +87,18 @@ pub struct UpdateUserInfoRequest {
 pub struct UserInfoDTO {
     #[cfg_attr(feature = "swagger", schema(example = "202358314046"))]
     pub username: String,
-    
+
     #[cfg_attr(feature = "swagger", schema(example = "Inkpear"))]
     pub nickname: String,
-    
+
     pub role: UserRole,
-    
+
     #[cfg_attr(feature = "swagger", schema(example = "inkpear202413@gmail.com"))]
     pub email: Option<String>,
-    
+
     #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
     pub phone: Option<String>,
-    
+
     #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]
     pub major: Option<String>,
 

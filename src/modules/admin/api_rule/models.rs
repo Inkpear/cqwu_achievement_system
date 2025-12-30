@@ -91,4 +91,5 @@ pub struct RoutesFilter {
     #[cfg_attr(feature = "swagger", schema(example = "/api/admin/user/"))]
     pub prefix: Option<String>,
     pub method: Option<HttpMethod>,
+    pub user_id: Option<Uuid>,
 }

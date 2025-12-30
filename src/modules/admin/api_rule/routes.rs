@@ -9,8 +9,9 @@ use crate::{
     modules::admin::api_rule::{
         models::{GrantUserApiRuleRequest, QueryUserApiRuleRequest, RoutesFilter},
         service::{
-            check_api_rule_validity, do_filter_with_prefix, get_registry_routes,
-            grant_user_api_access_rule, query_user_api_access_rules, revoke_user_api_access_rule,
+            check_api_rule_validity, do_filter_with_prefix, do_filter_with_user_exists_rules,
+            get_registry_routes, grant_user_api_access_rule, query_user_api_access_rules,
+            revoke_user_api_access_rule,
         },
     },
 };
@@ -149,6 +150,7 @@ pub async fn query_user_api_access_rules_handler(
         params(
             ("prefix" = Option<String>, Query, description = "路由前缀过滤"),
             ("method" = Option<HttpMethod>, Query, description = "HTTP 方法过滤"),
+            ("user_id" = Option<Uuid>, Query, description = "根据用户已有规则过滤"),
         ),
         security(
             ("bearer_auth" = [])
@@ -168,6 +170,9 @@ pub async fn get_registry_routes_handler(
     let prefix = filter.prefix.as_deref().unwrap_or("");
     let method = filter.method.as_ref().unwrap_or(&HttpMethod::ALL);
     do_filter_with_prefix(&mut routes, prefix, method);
+    if let Some(user_id) = &filter.user_id {
+        do_filter_with_user_exists_rules(&app_state.pool, &mut routes, user_id).await?;
+    }
 
     Ok(AppResponse::success_msg(routes, "获取路由路径成功"))
 }

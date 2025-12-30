@@ -207,10 +207,52 @@ pub async fn get_registry_routes(pool: &PgPool) -> Result<Vec<RouteInfo>, AppErr
     Ok(routes)
 }
 
+#[tracing::instrument(name = "获取用户有效的 API 访问规则", skip(pool, user_id))]
+pub async fn get_effective_rules_for_user(
+    pool: &PgPool,
+    user_id: &Uuid,
+) -> Result<Vec<(String, HttpMethod)>, AppError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT api_pattern, http_method
+        FROM sys_access_rule
+        WHERE user_id = $1
+            AND (expires_at IS NULL OR expires_at >= NOW())
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    let rules = rows
+        .into_iter()
+        .map(|row| (row.api_pattern, HttpMethod::from(row.http_method)))
+        .collect();
+
+    Ok(rules)
+}
+
 pub fn do_filter_with_prefix(routes: &mut Vec<RouteInfo>, prefix: &str, method: &HttpMethod) {
     routes.retain(|route| {
         route.path.starts_with(prefix) && (route.method == *method || *method == HttpMethod::ALL)
     });
+}
+
+pub async fn do_filter_with_user_exists_rules(
+    pool: &PgPool,
+    routes: &mut Vec<RouteInfo>,
+    user_id: &Uuid,
+) -> Result<(), AppError> {
+    let user_rules = get_effective_rules_for_user(pool, user_id).await?;
+    routes.retain(|route| {
+        user_rules.iter().any(|(pattern, method)| {
+            !route.path.starts_with(pattern)
+                || (route.method != *method && *method != HttpMethod::ALL)
+        })
+    });
+
+    Ok(())
 }
 
 fn build_template_route_info(template_id: Uuid, name: String, category: String) -> Vec<RouteInfo> {

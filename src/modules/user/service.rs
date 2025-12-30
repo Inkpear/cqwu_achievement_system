@@ -4,8 +4,11 @@ use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
-    domain::FileMetadata,
-    modules::user::models::{PresignedAvatarUrlResponse, UpdateUserInfoRequest, UserInfoDTO},
+    domain::{FileMetadata, HttpMethod, RouteInfo},
+    modules::{
+        admin::api_rule::service::{get_effective_rules_for_user, get_registry_routes},
+        user::models::{PresignedAvatarUrlResponse, UpdateUserInfoRequest, UserInfoDTO},
+    },
     utils::{
         password::hash_password,
         s3_storage::{S3Storage, build_temp_avatar_key},
@@ -185,7 +188,7 @@ pub async fn get_user_info_by_id(
     let mut user = sqlx::query_as!(
         UserInfoDTO,
         r#"
-        SELECT username, nickname, role, email, phone, major, college,  avatar_key
+        SELECT username, nickname, role, email, phone, major, college, avatar_key
         FROM sys_user
         WHERE user_id = $1
         "#,
@@ -201,4 +204,21 @@ pub async fn get_user_info_by_id(
     }
 
     Ok(user)
+}
+
+#[tracing::instrument(name = "从数据库中获取用户有效路由列表", skip(pool))]
+pub async fn get_user_effective_routes(
+    pool: &PgPool,
+    user_id: &Uuid,
+) -> Result<Vec<RouteInfo>, AppError> {
+    let user_rules = get_effective_rules_for_user(pool, user_id).await?;
+    let mut sys_routes = get_registry_routes(pool).await?;
+    sys_routes.retain(|route| {
+        user_rules.iter().any(|(api_pattern, method)| {
+            route.path.starts_with(api_pattern)
+                && (route.method.eq(method) || HttpMethod::ALL.eq(method))
+        })
+    });
+
+    Ok(sys_routes)
 }

@@ -23,6 +23,7 @@ use utoipa::{
         crate::modules::user::routes::update_avatar_handler,
         crate::modules::user::routes::get_user_info_handler,
         crate::modules::user::routes::update_user_info_handler,
+        crate::modules::user::routes::get_user_effective_routes_handler,
         crate::modules::admin::user::routes::modify_user_status_handler,
         crate::modules::admin::api_rule::routes::grant_user_api_rule_handler,
         crate::modules::admin::api_rule::routes::revoke_user_api_rule_handler,

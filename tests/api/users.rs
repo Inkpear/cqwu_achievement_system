@@ -274,3 +274,42 @@ async fn user_update_user_info_success() {
         new_phone
     );
 }
+
+#[tokio::test]
+async fn grant_user_rule_and_user_query_effective_routes_success() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+
+    let body = serde_json::json!({
+        "user_id": user.user_id.unwrap().to_string(),
+        "api_pattern": "/api/",
+        "expire_at": null,
+        "description": "测试授予用户 API 访问权限"
+    });
+
+    let response = app
+        .post_grant_user_api_rule(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&response, 200, "授予用户 API 访问权限成功");
+
+    app.login(&user).await;
+
+    let response = app
+        .get_user_effective_routes()
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&response, 200, "获取用户有效路由成功");
+    let data = response["data"]
+        .as_array()
+        .expect("data should be an array");
+
+    assert!(!data.is_empty());
+}

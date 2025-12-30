@@ -12,9 +12,9 @@ use crate::{
                 UpdateUserInfoRequest,
             },
             service::{
-                build_avatar_key, change_user_password, get_user_info_by_id,
-                parse_avatar_key_to_url, presigned_avatar_url, save_user_avatar_into_database,
-                store_user_avatar, update_user_info,
+                build_avatar_key, change_user_password, get_user_effective_routes,
+                get_user_info_by_id, parse_avatar_key_to_url, presigned_avatar_url,
+                save_user_avatar_into_database, store_user_avatar, update_user_info,
             },
         },
     },
@@ -22,7 +22,10 @@ use crate::{
 };
 
 #[cfg(feature = "swagger")]
-use crate::modules::user::models::{PresignedAvatarUrlResponse, UserInfoDTO};
+use {
+    crate::domain::RouteInfo,
+    crate::modules::user::models::{PresignedAvatarUrlResponse, UserInfoDTO},
+};
 
 #[cfg_attr(
     feature = "swagger",
@@ -210,4 +213,28 @@ pub async fn get_user_info_handler(
     let user_dto = get_user_info_by_id(&app_state.s3_storage, &user.sub, &app_state.pool).await?;
 
     Ok(AppResponse::success_msg(user_dto, "获取个人信息成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        get,
+        path = "/api/user/routes",
+        tag = "用户管理",
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "获取用户有效路由成功", body = Vec<RouteInfo>),
+        )
+    )
+)]
+#[tracing::instrument(name = "获取用户的有效路由", skip(app_state, user))]
+pub async fn get_user_effective_routes_handler(
+    app_state: web::Data<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl Responder, AppError> {
+    let routes = get_user_effective_routes(&app_state.pool, &user.sub).await?;
+
+    Ok(AppResponse::success_msg(routes, "获取用户有效路由成功"))
 }

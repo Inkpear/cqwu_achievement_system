@@ -412,6 +412,14 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn get_user_effective_routes(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/user/routes", self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

@@ -144,6 +144,19 @@ impl S3Storage {
 
         Ok(head_object_output)
     }
+
+    pub async fn object_exists(&self, object_key: &str) -> Result<bool, anyhow::Error> {
+        match self.get_head_object_output(object_key).await {
+            Ok(_) => Ok(true),
+            Err(e) => match e.into_service_error() {
+                HeadObjectError::NotFound(_) => Ok(false),
+                other => Err(anyhow::anyhow!(
+                    "检查对象是否存在时发生错误: {}",
+                    other.to_string()
+                )),
+            },
+        }
+    }
 }
 
 pub fn build_upload_session_key(session_id: &Uuid) -> String {
@@ -156,4 +169,12 @@ pub fn build_temp_object_key(session_id: &Uuid, file_id: &Uuid) -> String {
 
 pub fn build_archive_dest_key(record_id: &Uuid, file_id: &Uuid) -> String {
     format!("archive/{}/{}", record_id, file_id)
+}
+
+pub fn build_avatar_dest_key(user_id: &Uuid) -> String {
+    format!("avatar/{}", user_id)
+}
+
+pub fn build_temp_avatar_key(file_id: &Uuid) -> String {
+    format!("temp/avatar/{}", file_id)
 }

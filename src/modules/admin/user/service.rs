@@ -7,15 +7,19 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         pagination::PageData,
     },
-    modules::admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
+    modules::{
+        admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
+        user::service::parse_avatar_key_to_url,
+    },
+    utils::s3_storage::S3Storage,
 };
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
 pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, AppError> {
     let row = sqlx::query!(
         r#"
-            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone)
-            VALUES($1, $2, $3, $4, $5, $6)
+            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, major, college)
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING user_id, created_at
         "#,
         user.username,
@@ -23,7 +27,9 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         user.password.expose_secret(),
         user.role.as_str(),
         user.email,
-        user.phone
+        user.phone,
+        user.major,
+        user.college,
     )
     .fetch_one(pool)
     .await
@@ -44,6 +50,8 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         is_active: true,
         email: user.email.clone(),
         phone: user.phone.clone(),
+        major: user.major.clone(),
+        college: user.college.clone(),
         created_at: row.created_at,
         avatar_key: None,
     };
@@ -80,9 +88,10 @@ pub async fn modify_user_status(
     Ok(())
 }
 
-#[tracing::instrument(name = "从数据库查询用户列表", skip(pool, req))]
+#[tracing::instrument(name = "从数据库查询用户列表", skip(pool, req, s3_storage))]
 pub async fn query_users(
     pool: &PgPool,
+    s3_storage: &S3Storage,
     req: &QueryUserRequest,
 ) -> Result<PageData<UserDTO>, AppError> {
     let count_result = sqlx::query!(
@@ -112,7 +121,7 @@ pub async fn query_users(
 
     let total = count_result.count.unwrap_or(0);
 
-    let rows = sqlx::query_as!(
+    let mut rows = sqlx::query_as!(
         UserDTO,
         r#"
         SELECT 
@@ -123,6 +132,8 @@ pub async fn query_users(
             is_active,
             email,
             phone,
+            major,
+            college,
             avatar_key,
             created_at
         FROM sys_user
@@ -150,6 +161,13 @@ pub async fn query_users(
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    for user in &mut rows {
+        if let Some(avatar_key) = &user.avatar_key {
+            let view_url = parse_avatar_key_to_url(s3_storage, avatar_key).await?;
+            user.avatar_key = Some(view_url);
+        }
+    }
 
     let page_data = PageData::from(rows, total, req.page, req.page_size);
 

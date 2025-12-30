@@ -35,9 +35,17 @@ pub struct RegisterUserRequest {
     #[validate(email(message = "邮箱格式不正确"))]
     pub email: Option<String>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "+1234567890"))]
-    #[validate(length(min = 7, max = 15, message = "电话号码长度必须在7-15个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
+    #[validate(length(min = 11, max = 11, message = "电话号码长度必须为11个字符"))]
     pub phone: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]
+    #[validate(length(max = 50, message = "专业名称不能超过50个字符"))]
+    pub major: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "数学与人工智能学院"))]
+    #[validate(length(max = 50, message = "学院名称不能超过50个字符"))]
+    pub college: Option<String>,
 }
 
 pub struct RegisterUser {
@@ -47,6 +55,8 @@ pub struct RegisterUser {
     pub role: UserRole,
     pub email: Option<String>,
     pub phone: Option<String>,
+    pub major: Option<String>,
+    pub college: Option<String>,
 }
 
 impl RegisterUser {
@@ -59,6 +69,8 @@ impl RegisterUser {
             role: req.role,
             email: req.email,
             phone: req.phone,
+            major: req.major,
+            college: req.college,
         })
     }
 }
@@ -91,8 +103,14 @@ pub struct UserDTO {
     #[cfg_attr(feature = "swagger", schema(example = "user@example.com"))]
     pub email: Option<String>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "+1234567890"))]
+    #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
     pub phone: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]
+    pub major: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "数学与人工智能学院"))]
+    pub college: Option<String>,
 
     #[cfg_attr(
         feature = "swagger",

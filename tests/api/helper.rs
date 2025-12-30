@@ -372,6 +372,46 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn post_to_presigned_avatar_url(
+        &self,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/user/avatar/presigned", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_to_update_avatar(&self, file_id: &str) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/user/avatar/{}", self.address, file_id))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_to_update_user_info(
+        &self,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/user/update", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_user_info(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/user/me", self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 pub struct TestUser {

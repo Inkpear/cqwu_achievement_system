@@ -144,7 +144,7 @@ pub async fn query_users_handler(
     let req = req.into_inner();
     req.validate().map_err(AppError::ValidationError)?;
 
-    let page_data = query_users(&app_state.pool, &req).await?;
+    let page_data = query_users(&app_state.pool, &app_state.s3_storage, &req).await?;
 
     Ok(AppResponse::success_msg(page_data, "查询用户成功"))
 }

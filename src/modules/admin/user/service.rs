@@ -14,8 +14,8 @@ use crate::{
 pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, AppError> {
     let row = sqlx::query!(
         r#"
-            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, avatar_url)
-            VALUES($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone)
+            VALUES($1, $2, $3, $4, $5, $6)
             RETURNING user_id, created_at
         "#,
         user.username,
@@ -23,8 +23,7 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         user.password.expose_secret(),
         user.role.as_str(),
         user.email,
-        user.phone,
-        user.avatar_url,
+        user.phone
     )
     .fetch_one(pool)
     .await
@@ -45,8 +44,8 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         is_active: true,
         email: user.email.clone(),
         phone: user.phone.clone(),
-        avatar_url: user.avatar_url.clone(),
         created_at: row.created_at,
+        avatar_key: None,
     };
 
     Ok(dto)
@@ -124,7 +123,7 @@ pub async fn query_users(
             is_active,
             email,
             phone,
-            avatar_url,
+            avatar_key,
             created_at
         FROM sys_user
         WHERE 

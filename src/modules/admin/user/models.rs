@@ -38,13 +38,6 @@ pub struct RegisterUserRequest {
     #[cfg_attr(feature = "swagger", schema(example = "+1234567890"))]
     #[validate(length(min = 7, max = 15, message = "电话号码长度必须在7-15个字符之间"))]
     pub phone: Option<String>,
-
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "https://example.com/avatar.png")
-    )]
-    #[validate(url(message = "头像URL格式不正确"))]
-    pub avatar_url: Option<String>,
 }
 
 pub struct RegisterUser {
@@ -54,7 +47,6 @@ pub struct RegisterUser {
     pub role: UserRole,
     pub email: Option<String>,
     pub phone: Option<String>,
-    pub avatar_url: Option<String>,
 }
 
 impl RegisterUser {
@@ -67,7 +59,6 @@ impl RegisterUser {
             role: req.role,
             email: req.email,
             phone: req.phone,
-            avatar_url: req.avatar_url,
         })
     }
 }
@@ -107,7 +98,7 @@ pub struct UserDTO {
         feature = "swagger",
         schema(example = "https://example.com/avatar.png")
     )]
-    pub avatar_url: Option<String>,
+    pub avatar_key: Option<String>,
 
     pub created_at: DateTime<Utc>,
 }

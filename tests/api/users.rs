@@ -286,6 +286,7 @@ async fn grant_user_rule_and_user_query_effective_routes_success() {
     let body = serde_json::json!({
         "user_id": user.user_id.unwrap().to_string(),
         "api_pattern": "/api/",
+        "http_method": "ALL",
         "expire_at": null,
         "description": "测试授予用户 API 访问权限"
     });
@@ -296,7 +297,7 @@ async fn grant_user_rule_and_user_query_effective_routes_success() {
         .json::<serde_json::Value>()
         .await
         .expect("Failed to parse JSON response");
-    check_response_code_and_message(&response, 200, "授予用户 API 访问权限成功");
+    check_response_code_and_message(&response, 201, "授予用户 API 访问规则成功");
 
     app.login(&user).await;
 

@@ -147,7 +147,7 @@ pub struct QueryUserRequest {
     pub page: i64,
 
     #[cfg_attr(feature = "swagger", schema(example = "10"))]
-    #[validate(range(min = 1, max = 100, message = "每页数量必须在1-100之间"))]
+    #[validate(range(min = 1, message = "每页数量必须大于等于1"))]
     #[serde(default = "default_page_size")]
     pub page_size: i64,
 }

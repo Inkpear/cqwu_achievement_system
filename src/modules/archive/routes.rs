@@ -146,6 +146,8 @@ pub async fn query_archive_records_handler(
     template_id: web::Path<Uuid>,
     req: web::Json<QueryArchiveRecordsRequest>,
 ) -> Result<impl Responder, AppError> {
+    req.validate().map_err(AppError::ValidationError)?;
+    
     let schema_context =
         get_or_load_template_context(&app_state.pool, &app_state.schema_cache, &template_id)
             .await?;

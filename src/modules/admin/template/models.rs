@@ -54,13 +54,17 @@ pub struct TemplateDTO {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct QueryTemplatesRequest {
     pub template_id: Option<uuid::Uuid>,
     pub name: Option<String>,
     pub category: Option<String>,
+
+    #[validate(range(min = 1, message = "页码必须大于等于1"))]
     #[serde(default = "default_page")]
     pub page: i64,
+
+    #[validate(range(min = 1, message = "每页数量必须大于等于1"))]
     #[serde(default = "default_page_size")]
     pub page_size: i64,
 }

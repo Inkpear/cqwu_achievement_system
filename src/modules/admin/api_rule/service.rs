@@ -262,34 +262,34 @@ fn build_template_route_info(template_id: Uuid, name: String, category: String) 
             method: HttpMethod::POST,
             path: format!("/api/archive/{}/create/", template_id),
             category: category.clone(),
-            description: format!("用于创建{}", route_name),
+            description: format!("{}&用于创建{}", route_name, route_name),
         },
         RouteInfo {
             method: HttpMethod::GET,
             path: format!("/api/archive/{}/init_upload/", template_id),
             category: category.clone(),
-            description: format!("如果{}需要文件， 则用于初始化该模板的上传会话", route_name),
+            description: format!("{}&如果{}需要文件， 则用于初始化该模板的上传会话", route_name, route_name),
         },
         RouteInfo {
             method: HttpMethod::POST,
             path: format!("/api/archive/{}/presigned/", template_id),
             category: category.clone(),
             description: format!(
-                "如果{}需要文件， 则用于获取该模板的预签名上传URL",
-                route_name
+                "{}&如果{}需要文件， 则用于获取该模板的预签名上传URL",
+                route_name, route_name
             ),
         },
         RouteInfo {
             method: HttpMethod::POST,
             path: format!("/api/archive/{}/query/", template_id),
             category: category.clone(),
-            description: format!("用于查询{}的归档记录", route_name),
+            description: format!("{}&用于查询{}的归档记录", route_name, route_name),
         },
         RouteInfo {
             method: HttpMethod::DELETE,
             path: format!("/api/archive/{}/delete/", template_id),
             category: category.clone(),
-            description: format!("用于删除{}的归档记录", route_name),
+            description: format!("{}&用于删除{}的归档记录", route_name, route_name),
         },
     ]
 }

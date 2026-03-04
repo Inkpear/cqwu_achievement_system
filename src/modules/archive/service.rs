@@ -13,9 +13,12 @@ use crate::{
         pagination::PageData,
     },
     domain::{FileMetadata, SchemaFileFieldConfig, SchemaFileFieldConfigs, validate_instance},
-    modules::archive::models::{
-        ArchiveRecordDTO, CreateArchiveRecordRequest, PresignedResponse,
-        QueryArchiveRecordsRequest, UploadSession,
+    modules::{
+        admin::template::models::TemplateDTO,
+        archive::models::{
+            ArchiveRecordDTO, CreateArchiveRecordRequest, PresignedResponse,
+            QueryArchiveRecordsRequest, UploadSession,
+        },
     },
     utils::{
         redis_cache::RedisCache,
@@ -706,6 +709,7 @@ pub async fn check_session_exists_and_delete_it(
 pub async fn delete_archive_record_by_id(
     pool: &mut Transaction<'_, Postgres>,
     s3_storage: &S3Storage,
+    template_id: &Uuid,
     record_id: &Uuid,
 ) -> Result<(), AppError> {
     let object_keys = sqlx::query!(
@@ -722,9 +726,13 @@ pub async fn delete_archive_record_by_id(
     let row = sqlx::query!(
         r#"
         DELETE FROM archive_record
-        WHERE record_id = $1
+        WHERE 
+            record_id = $1
+            AND
+            template_id = $2
         "#,
-        record_id
+        record_id,
+        template_id
     )
     .execute(pool.as_mut())
     .await
@@ -749,6 +757,37 @@ pub async fn delete_archive_record_by_id(
 
     tracing::info!("归档记录已删除: {}", record_id);
     Ok(())
+}
+
+#[tracing::instrument(name = "从数据库获取模板信息", skip(pool))]
+pub async fn get_template_info_by_id(
+    pool: &PgPool,
+    template_id: &Uuid,
+) -> Result<TemplateDTO, AppError> {
+    let row = sqlx::query_as!(
+        TemplateDTO,
+        r#"
+        SELECT 
+            template_id,
+            name,
+            category,
+            description,
+            schema_def,
+            is_active,
+            created_at,
+            updated_at,
+            created_by
+        FROM sys_template
+        WHERE
+            template_id = $1
+        "#,
+        template_id,
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    row.ok_or(AppError::DataNotFound("模板不存在".into()))
 }
 
 fn collect_uuids_from_json_value(val: &serde_json::Value, collector: &mut HashSet<Uuid>) {

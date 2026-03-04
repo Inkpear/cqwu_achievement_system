@@ -494,7 +494,7 @@ async fn init_upload_session_and_get_upload_urls_success_and_get_again_returns_4
     check_response_code_and_message(&presigned_response_2, 403, "该字段配额已用完");
 }
 
-async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
+async fn create_a_file_record_return_record_id(app: &mut TestApp) -> (Uuid, Uuid) {
     let template_body = serde_json::json!({
         "name": "文件归档模板",
         "category": "文件收集",
@@ -617,10 +617,12 @@ async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
         .expect("Failed to read file content");
     assert_eq!(content, dummy_file_content);
 
-    record_res["data"]["record_id"]
+    let record_id = record_res["data"]["record_id"]
         .as_str()
         .and_then(|id_str| Uuid::parse_str(id_str).ok())
-        .expect("record_id should be a valid UUID")
+        .expect("record_id should be a valid UUID");
+
+    (template_id_uuid, record_id)
 }
 
 #[tokio::test]
@@ -695,10 +697,10 @@ async fn create_a_file_record_and_delete_it_success() {
     let user = TestUser::default_admin(&app.db_pool).await;
     app.login(&user).await;
 
-    let record_id = create_a_file_record_return_record_id(&mut app).await;
+    let (template_id, record_id) = create_a_file_record_return_record_id(&mut app).await;
 
     let delete_res = app
-        .delete_archive_record(&record_id.to_string())
+        .delete_archive_record(&template_id.to_string(), &record_id.to_string())
         .await
         .json::<serde_json::Value>()
         .await
@@ -1229,6 +1231,165 @@ async fn create_a_record_fail_with_fake_session_id() {
         .await
         .unwrap();
     check_response_code_and_message(&record_res, 404, "上传会话不存在或已过期");
+}
+
+#[tokio::test]
+async fn get_archive_template_info_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let body = serde_json::json!({
+        "name": "模板信息测试模板",
+        "category": "接口测试",
+        "description": "用于测试获取模板信息接口",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" }
+                },
+                "required": ["title"]
+            },
+            "instance": { "title": "示例标题" }
+        }
+    });
+
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&create_res, 201, "收集模板创建成功");
+
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    let info_res = app
+        .get_archive_template_info(template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 200, "获取模板信息成功");
+
+    assert_eq!(info_res["data"]["template_id"].as_str().unwrap(), template_id);
+    assert_eq!(info_res["data"]["name"].as_str().unwrap(), "模板信息测试模板");
+    assert_eq!(info_res["data"]["category"].as_str().unwrap(), "接口测试");
+    assert_eq!(
+        info_res["data"]["description"].as_str().unwrap(),
+        "用于测试获取模板信息接口"
+    );
+    assert!(info_res["data"]["is_active"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn get_archive_template_info_returns_404_for_nonexistent_template() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let fake_template_id = Uuid::new_v4().to_string();
+
+    let info_res = app
+        .get_archive_template_info(&fake_template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 404, "模板不存在");
+}
+
+#[tokio::test]
+async fn get_archive_template_info_returns_403_without_permission() {
+    let mut app = TestApp::spawn().await;
+    let admin_user = TestUser::default_admin(&app.db_pool).await;
+    let mut normal_user = TestUser::new();
+    normal_user.store(&app.db_pool).await;
+
+    app.login(&admin_user).await;
+
+    let body = serde_json::json!({
+        "name": "权限测试模板",
+        "category": "权限测试",
+        "description": "...",
+        "schema": {
+            "schema_def": { "type": "object" },
+            "instance": {}
+        }
+    });
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    app.login(&normal_user).await;
+
+    let info_res = app.get_archive_template_info(template_id).await;
+    assert_eq!(info_res.status().as_u16(), 403);
+}
+
+#[tokio::test]
+async fn get_archive_template_info_success_with_granted_permission() {
+    let mut app = TestApp::spawn().await;
+    let admin_user = TestUser::default_admin(&app.db_pool).await;
+    let mut normal_user = TestUser::new();
+    normal_user.store(&app.db_pool).await;
+
+    app.login(&admin_user).await;
+
+    let body = serde_json::json!({
+        "name": "授权模板信息测试模板",
+        "category": "授权测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "note": { "type": "string" }
+                }
+            },
+            "instance": {}
+        }
+    });
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&create_res, 201, "收集模板创建成功");
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    let grant_body = serde_json::json!({
+        "user_id": normal_user.user_id.unwrap().to_string(),
+        "api_pattern": format!("/api/archive/{}/", template_id),
+        "http_method": "ALL",
+        "description": "允许访问归档模板接口",
+        "expires_at": null
+    });
+    let grant_res = app
+        .post_grant_user_api_rule(&grant_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&grant_res, 201, "授予用户 API 访问规则成功");
+
+    app.login(&normal_user).await;
+
+    let info_res = app
+        .get_archive_template_info(template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 200, "获取模板信息成功");
+    assert_eq!(info_res["data"]["name"].as_str().unwrap(), "授权模板信息测试模板");
+    assert_eq!(info_res["data"]["category"].as_str().unwrap(), "授权测试");
 }
 
 #[tokio::test]

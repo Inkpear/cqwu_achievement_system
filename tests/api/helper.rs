@@ -351,11 +351,22 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn delete_archive_record(&self, record_id: &str) -> reqwest::Response {
+    pub async fn get_archive_template_info(&self, template_id: &str) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/archive/{}/info",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_archive_record(&self, template_id: &str, record_id: &str) -> reqwest::Response {
         self.api_client
             .delete(&format!(
-                "{}/api/archive/{}/delete",
-                self.address, record_id
+                "{}/api/archive/{}/{}/delete",
+                self.address, template_id, record_id
             ))
             .send()
             .await

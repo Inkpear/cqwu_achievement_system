@@ -13,8 +13,8 @@ use crate::{
                 check_file_validity, check_need_file, check_session_exists_and_delete_it,
                 create_archive_record, create_files_record, delete_archive_record_by_id,
                 enrich_archive_records_with_urls, get_or_load_template_context,
-                init_upload_session, presigned_upload_url, query_archive_records,
-                try_to_get_field_quota, validate_instance_by_id,
+                get_template_info_by_id, init_upload_session, presigned_upload_url,
+                query_archive_records, try_to_get_field_quota, validate_instance_by_id,
             },
         },
     },
@@ -23,6 +23,7 @@ use crate::{
 #[cfg(feature = "swagger")]
 use crate::{
     common::pagination::PageData,
+    modules::admin::template::models::TemplateDTO,
     modules::archive::models::{ArchiveRecordDTO, PresignedResponse},
 };
 
@@ -147,7 +148,7 @@ pub async fn query_archive_records_handler(
     req: web::Json<QueryArchiveRecordsRequest>,
 ) -> Result<impl Responder, AppError> {
     req.validate().map_err(AppError::ValidationError)?;
-    
+
     let schema_context =
         get_or_load_template_context(&app_state.pool, &app_state.schema_cache, &template_id)
             .await?;
@@ -284,9 +285,10 @@ pub async fn presigned_upload_url_handler(
     feature = "swagger",
     utoipa::path(
         delete,
-        path = "/api/archive/{record_id}/delete",
+        path = "/api/archive/{template_id}/{record_id}/delete",
         tag = "归档记录管理",
         params(
+            ("template_id" = uuid::Uuid, Path, description = "模板ID"),
             ("record_id" = uuid::Uuid, Path, description = "归档记录ID")
         ),
         security(
@@ -298,28 +300,50 @@ pub async fn presigned_upload_url_handler(
         )
     )
 )]
-#[tracing::instrument(
-    name = "删除归档记录",
-    skip(app_state, record_id),
-    fields(
-        record_id = %record_id
-    )
-)]
+#[tracing::instrument(name = "删除归档记录", skip(app_state))]
 pub async fn delete_archive_record_handler(
     app_state: web::Data<AppState>,
-    record_id: web::Path<Uuid>,
+    path: web::Path<(Uuid, Uuid)>,
 ) -> Result<impl Responder, AppError> {
+    let (template_id, record_id) = path.into_inner();
     let mut tx = app_state
         .pool
         .begin()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
-    delete_archive_record_by_id(&mut tx, &app_state.s3_storage, &record_id).await?;
+    delete_archive_record_by_id(&mut tx, &app_state.s3_storage, &template_id, &record_id).await?;
 
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     Ok(AppResponse::ok_msg("删除归档记录成功"))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        get,
+        path = "/api/archive//{template_id}/info",
+        tag = "归档记录管理",
+        params(
+            ("template_id" = uuid::Uuid, Path, description = "模板ID")
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "获取模板信息成功", body = AppResponse<TemplateDTO>),
+            (status = 404, description = "模板不存在"),
+        )
+    )
+)]
+#[tracing::instrument(name = "获取模板信息", skip(app_state, template_id))]
+pub async fn get_template_info_handler(
+    app_state: web::Data<AppState>,
+    template_id: web::Path<Uuid>,
+) -> Result<impl Responder, AppError> {
+    let template_info = get_template_info_by_id(&app_state.pool, &template_id).await?;
+    Ok(AppResponse::success_msg(template_info, "获取模板信息成功"))
 }

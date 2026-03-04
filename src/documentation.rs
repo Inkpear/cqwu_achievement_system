@@ -42,6 +42,7 @@ use utoipa::{
         crate::modules::archive::routes::init_upload_session_handler,
         crate::modules::archive::routes::presigned_upload_url_handler,
         crate::modules::archive::routes::delete_archive_record_handler,
+        crate::modules::archive::routes::get_template_info_handler
     ),
     components(
         schemas(

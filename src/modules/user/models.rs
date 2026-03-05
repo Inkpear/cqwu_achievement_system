@@ -36,8 +36,7 @@ impl ChangePassword {
 }
 
 static PHOTO_NAME: LazyLock<regex::Regex> = LazyLock::new(|| {
-    regex::Regex::new(r"^.+\.(jpg|png|jpeg)$")
-        .expect("Failed to compile photo_name regex")
+    regex::Regex::new(r"^.+\.(jpg|png|jpeg)$").expect("Failed to compile photo_name regex")
 });
 
 pub static PHONE_NUMBER: LazyLock<regex::Regex> = LazyLock::new(|| {

@@ -268,7 +268,10 @@ fn build_template_route_info(template_id: Uuid, name: String, category: String) 
             method: HttpMethod::GET,
             path: format!("/api/archive/{}/init_upload/", template_id),
             category: category.clone(),
-            description: format!("{}&如果{}需要文件， 则用于初始化该模板的上传会话", route_name, route_name),
+            description: format!(
+                "{}&如果{}需要文件， 则用于初始化该模板的上传会话",
+                route_name, route_name
+            ),
         },
         RouteInfo {
             method: HttpMethod::POST,
@@ -290,6 +293,12 @@ fn build_template_route_info(template_id: Uuid, name: String, category: String) 
             path: format!("/api/archive/{}/delete/", template_id),
             category: category.clone(),
             description: format!("{}&用于删除{}的归档记录", route_name, route_name),
+        },
+        RouteInfo {
+            method: HttpMethod::GET,
+            path: format!("/api/archive/{}/info/", template_id),
+            category: category.clone(),
+            description: format!("{}&用于获取{}的模板信息", route_name, route_name),
         },
     ]
 }

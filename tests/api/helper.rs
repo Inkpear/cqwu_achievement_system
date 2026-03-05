@@ -248,6 +248,17 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn delete_user(&self, user_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/user/delete/{}",
+                self.address, user_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
     pub async fn delete_template(&self, template_id: &str) -> reqwest::Response {
         self.api_client
             .delete(&format!(
@@ -362,10 +373,14 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn delete_archive_record(&self, template_id: &str, record_id: &str) -> reqwest::Response {
+    pub async fn delete_archive_record(
+        &self,
+        template_id: &str,
+        record_id: &str,
+    ) -> reqwest::Response {
         self.api_client
             .delete(&format!(
-                "{}/api/archive/{}/{}/delete",
+                "{}/api/archive/{}/delete/{}",
                 self.address, template_id, record_id
             ))
             .send()
@@ -404,10 +419,7 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn patch_to_update_user_info(
-        &self,
-        body: &serde_json::Value,
-    ) -> reqwest::Response {
+    pub async fn patch_to_update_user_info(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
             .patch(&format!("{}/api/user/update", self.address))
             .json(body)

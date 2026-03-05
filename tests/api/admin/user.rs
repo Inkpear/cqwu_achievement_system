@@ -265,6 +265,71 @@ async fn create_user_and_filter_user_query_success() {
 }
 
 #[tokio::test]
+async fn admin_delete_user_success() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+
+    let mut user = TestUser::new();
+    user.store(&app.db_pool).await;
+    let user_id = user.user_id.unwrap();
+
+    let response = app
+        .delete_user(&user_id.to_string())
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 200, "删除用户成功");
+
+    let row = sqlx::query!(
+        r#"
+            SELECT user_id FROM sys_user
+            WHERE user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_optional(&app.db_pool)
+    .await
+    .expect("Failed to query database");
+
+    assert!(row.is_none());
+}
+
+#[tokio::test]
+async fn admin_delete_user_fail_when_user_not_exists() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+
+    let response = app
+        .delete_user(&Uuid::new_v4().to_string())
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 404, "用户不存在");
+}
+
+#[tokio::test]
+async fn admin_delete_user_fail_when_user_deletes_self() {
+    let mut app = TestApp::spawn().await;
+    let admin = TestUser::default_admin(&app.db_pool).await;
+    app.login(&admin).await;
+
+    let response = app
+        .delete_user(&admin.user_id.unwrap().to_string())
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&response, 403, "不能删除自己的账户");
+}
+
+#[tokio::test]
 async fn admin_change_user_password_and_user_login_success_with_new_password() {
     let mut app = TestApp::spawn().await;
     let admin = TestUser::default_admin(&app.db_pool).await;

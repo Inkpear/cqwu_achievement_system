@@ -1273,8 +1273,14 @@ async fn get_archive_template_info_success() {
         .unwrap();
     check_response_code_and_message(&info_res, 200, "获取模板信息成功");
 
-    assert_eq!(info_res["data"]["template_id"].as_str().unwrap(), template_id);
-    assert_eq!(info_res["data"]["name"].as_str().unwrap(), "模板信息测试模板");
+    assert_eq!(
+        info_res["data"]["template_id"].as_str().unwrap(),
+        template_id
+    );
+    assert_eq!(
+        info_res["data"]["name"].as_str().unwrap(),
+        "模板信息测试模板"
+    );
     assert_eq!(info_res["data"]["category"].as_str().unwrap(), "接口测试");
     assert_eq!(
         info_res["data"]["description"].as_str().unwrap(),
@@ -1388,7 +1394,10 @@ async fn get_archive_template_info_success_with_granted_permission() {
         .await
         .unwrap();
     check_response_code_and_message(&info_res, 200, "获取模板信息成功");
-    assert_eq!(info_res["data"]["name"].as_str().unwrap(), "授权模板信息测试模板");
+    assert_eq!(
+        info_res["data"]["name"].as_str().unwrap(),
+        "授权模板信息测试模板"
+    );
     assert_eq!(info_res["data"]["category"].as_str().unwrap(), "授权测试");
 }
 

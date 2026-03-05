@@ -22,7 +22,7 @@ pub fn config(cfg: &mut actix_web::web::ServiceConfig) {
                 actix_web::web::post().to(routes::presigned_upload_url_handler),
             )
             .route(
-                "/{template_id}/{record_id}/delete",
+                "/{template_id}/delete/{record_id}",
                 actix_web::web::delete().to(routes::delete_archive_record_handler),
             )
             .route(

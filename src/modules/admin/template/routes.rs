@@ -83,7 +83,7 @@ pub async fn query_templates_handler(
     req: web::Query<QueryTemplatesRequest>,
 ) -> Result<impl Responder, AppError> {
     req.validate().map_err(AppError::ValidationError)?;
-    
+
     let page_data = query_templates(&app_state.pool, &req.0).await?;
 
     Ok(AppResponse::success_msg(page_data, "查询收集模板成功"))

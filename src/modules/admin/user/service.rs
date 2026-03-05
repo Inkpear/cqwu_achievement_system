@@ -202,3 +202,26 @@ pub async fn admin_change_user_password(
 
     Ok(())
 }
+
+#[tracing::instrument(name = "删除用户至数据库", skip(pool))]
+pub async fn delete_user(pool: &PgPool, user_id: &Uuid) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM sys_user
+        WHERE user_id = $1
+        "#,
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("未找到用户以删除: {}", user_id);
+        return Err(AppError::DataNotFound("用户不存在".into()));
+    }
+
+    tracing::info!("用户 {} 已被删除", user_id);
+
+    Ok(())
+}

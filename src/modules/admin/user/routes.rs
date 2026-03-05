@@ -9,7 +9,9 @@ use crate::{
             ChangeUserPassword, ChangeUserPasswordRequest, ModifyUserStatusRequest,
             QueryUserRequest, RegisterUser, RegisterUserRequest,
         },
-        service::{admin_change_user_password, modify_user_status, query_users, store_user},
+        service::{
+            admin_change_user_password, delete_user, modify_user_status, query_users, store_user,
+        },
     },
     utils::password::hash_password,
 };
@@ -186,4 +188,35 @@ pub async fn admin_change_user_password_handler(
     admin_change_user_password(&app_state.pool, &req.user_id, &new_password_hash).await?;
 
     Ok(AppResponse::ok_msg("修改用户密码成功"))
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    delete,
+    path = "/api/admin/user/delete/{user_id}",
+    tag = "管理员-用户管理",
+    params(
+        ("user_id" = Uuid, Path, description = "用户 ID"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "删除用户成功"),
+        (status = 404, description = "用户不存在"),
+        (status = 403, description = "不能删除自己的账户"),
+    )
+))]
+#[tracing::instrument(name = "管理员删除用户", skip(app_state, user_id, user))]
+pub async fn admin_delete_user_handler(
+    app_state: web::Data<AppState>,
+    user_id: web::Path<uuid::Uuid>,
+    user: AuthenticatedUser,
+) -> Result<impl Responder, AppError> {
+    if user.sub == *user_id {
+        return Err(AppError::Forbidden("不能删除自己的账户".into()));
+    }
+
+    delete_user(&app_state.pool, &user_id).await?;
+
+    Ok(AppResponse::ok_msg("删除用户成功"))
 }

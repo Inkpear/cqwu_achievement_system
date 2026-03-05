@@ -178,6 +178,7 @@ pub async fn query_archive_records(
             if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
                 if db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
+                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT
                 {
                     return AppError::BuildSchemaQueryFailed;
                 }
@@ -222,6 +223,7 @@ pub async fn query_archive_records(
             if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
                 if db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
+                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT
                 {
                     return AppError::BuildSchemaQueryFailed;
                 }

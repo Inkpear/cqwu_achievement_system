@@ -135,6 +135,9 @@ impl DatabaseErrorCode {
     /// 数据类型不匹配 (Invalid Text Representation)
     pub const INVALID_TEXT_REPRESENTATION: &'static str = "22P02";
 
+    /// 无效的日期/时间格式 (Invalid Datetime Format)
+    pub const INVALID_DATETIME_FORMAT: &'static str = "22007";
+
     /// 字符串数据右截断 (String Data Right Truncation)
     pub const STRING_DATA_RIGHT_TRUNCATION: &'static str = "22001";
 

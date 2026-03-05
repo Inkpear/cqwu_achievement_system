@@ -74,7 +74,7 @@ async fn create_archive_and_query_success() {
         check_response_code_and_message(&archive_response, 201, "创建归档记录成功");
     }
 
-    let filters = vec![("username", "LIKE", "u%"), ("age", "GT", "26")];
+    let filters = vec![("username", "LIKE", "u%"), ("age", "NUMGT", "26")];
     let body = serde_json::json!({
         "filters": filters.iter().map(|(field, op, value)| {
             serde_json::json!({
@@ -323,7 +323,7 @@ async fn submit_a_invalid_archive_query_missing_400() {
 
     let invalid_query_body = serde_json::json!({
         "filters": [
-            { "field": "field1", "operator": "GT", "value": "value" }
+            { "field": "field1", "operator": "NUMGT", "value": "not_a_number" }
         ]
     });
 
@@ -1468,4 +1468,201 @@ async fn create_a_record_and_fuzzy_query_success() {
         record_id,
         "模糊查询结果应包含创建的记录"
     );
+}
+
+#[tokio::test]
+async fn create_archive_and_query_by_timestamp_gt_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "时间筛选测试模板",
+        "category": "测试",
+        "description": "用于测试时间类型 GT 筛选的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "event_date": { "type": "string" }
+                },
+                "required": ["title", "event_date"]
+            },
+            "instance": { "title": "示例", "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let records = [
+        ("早期事件", "2024-01-10T00:00:00Z"),
+        ("中期事件", "2024-06-15T00:00:00Z"),
+        ("晚期事件", "2024-12-25T00:00:00Z"),
+    ];
+    for (title, date) in &records {
+        let record_body = serde_json::json!({
+            "data": { "title": title, "event_date": date }
+        });
+        let res = app
+            .post_create_archive_record(template_id, &record_body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+        check_response_code_and_message(&res, 201, "创建归档记录成功");
+    }
+
+    // GT 2024-03-01 应只返回中期和晚期事件（共 2 条）
+    let query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMEGT", "value": "2024-03-01T00:00:00Z" }
+        ]
+    });
+    let query_res = app
+        .post_query_archive_records(template_id, &query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&query_res, 200, "查询归档记录成功");
+
+    let items = query_res["data"]["items"].as_array().expect("items should be an array");
+    assert_eq!(items.len(), 2, "GT 筛选应返回 2 条时间晚于 2024-03-01 的记录");
+
+    for item in items {
+        let event_date = item["data"]["event_date"].as_str().unwrap();
+        assert!(
+            event_date > "2024-03-01T00:00:00Z",
+            "查询结果中的 event_date ({}) 应晚于 2024-03-01",
+            event_date
+        );
+    }
+}
+
+#[tokio::test]
+async fn create_archive_and_query_by_timestamp_lt_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "时间 LT 筛选测试模板",
+        "category": "测试",
+        "description": "用于测试时间类型 LT 筛选的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "event_date": { "type": "string" }
+                },
+                "required": ["title", "event_date"]
+            },
+            "instance": { "title": "示例", "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let records = [
+        ("早期事件", "2024-01-10T00:00:00Z"),
+        ("中期事件", "2024-06-15T00:00:00Z"),
+        ("晚期事件", "2024-12-25T00:00:00Z"),
+    ];
+    for (title, date) in &records {
+        let record_body = serde_json::json!({
+            "data": { "title": title, "event_date": date }
+        });
+        let res = app
+            .post_create_archive_record(template_id, &record_body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+        check_response_code_and_message(&res, 201, "创建归档记录成功");
+    }
+
+    // LT 2024-09-01 应只返回早期和中期事件（共 2 条）
+    let query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMELT", "value": "2024-09-01T00:00:00Z" }
+        ]
+    });
+    let query_res = app
+        .post_query_archive_records(template_id, &query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&query_res, 200, "查询归档记录成功");
+
+    let items = query_res["data"]["items"].as_array().expect("items should be an array");
+    assert_eq!(items.len(), 2, "LT 筛选应返回 2 条时间早于 2024-09-01 的记录");
+
+    for item in items {
+        let event_date = item["data"]["event_date"].as_str().unwrap();
+        assert!(
+            event_date < "2024-09-01T00:00:00Z",
+            "查询结果中的 event_date ({}) 应早于 2024-09-01",
+            event_date
+        );
+    }
+}
+
+#[tokio::test]
+async fn submit_a_invalid_timestamp_archive_query_returns_400() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "无效时间查询测试模板",
+        "category": "测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "event_date": { "type": "string" }
+                },
+                "required": ["event_date"]
+            },
+            "instance": { "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let invalid_query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMEGT", "value": "not_a_timestamp" }
+        ]
+    });
+
+    let query_res = app
+        .post_query_archive_records(template_id, &invalid_query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&query_res, 400, "构造JSON Schema 查询失败");
 }

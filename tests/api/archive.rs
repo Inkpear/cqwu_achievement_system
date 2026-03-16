@@ -1533,8 +1533,14 @@ async fn create_archive_and_query_by_timestamp_gt_success() {
         .expect("Failed to parse JSON response");
     check_response_code_and_message(&query_res, 200, "查询归档记录成功");
 
-    let items = query_res["data"]["items"].as_array().expect("items should be an array");
-    assert_eq!(items.len(), 2, "GT 筛选应返回 2 条时间晚于 2024-03-01 的记录");
+    let items = query_res["data"]["items"]
+        .as_array()
+        .expect("items should be an array");
+    assert_eq!(
+        items.len(),
+        2,
+        "GT 筛选应返回 2 条时间晚于 2024-03-01 的记录"
+    );
 
     for item in items {
         let event_date = item["data"]["event_date"].as_str().unwrap();
@@ -1609,8 +1615,14 @@ async fn create_archive_and_query_by_timestamp_lt_success() {
         .expect("Failed to parse JSON response");
     check_response_code_and_message(&query_res, 200, "查询归档记录成功");
 
-    let items = query_res["data"]["items"].as_array().expect("items should be an array");
-    assert_eq!(items.len(), 2, "LT 筛选应返回 2 条时间早于 2024-09-01 的记录");
+    let items = query_res["data"]["items"]
+        .as_array()
+        .expect("items should be an array");
+    assert_eq!(
+        items.len(),
+        2,
+        "LT 筛选应返回 2 条时间早于 2024-09-01 的记录"
+    );
 
     for item in items {
         let event_date = item["data"]["event_date"].as_str().unwrap();

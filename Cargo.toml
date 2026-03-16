@@ -37,7 +37,7 @@ aws-config = "1.8"
 aws-sdk-s3 = "1.1"
 mime_guess = "2"
 urlencoding = "2.1"
-redis = { version = "1", features = ["tokio-comp", "json"] }
+redis = { version = "0.32", features = ["tokio-comp", "json"] }
 deadpool-redis = {version = "0.22", features = ["serde"] }
 
 [dependencies.sqlx]

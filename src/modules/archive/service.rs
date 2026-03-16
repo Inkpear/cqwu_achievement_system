@@ -203,11 +203,18 @@ pub async fn query_archive_records(
     if let Some(filters) = &req.filters {
         build_where_clause(&mut query_builder, filters);
     }
-    let sort_field = req.sort.as_ref().map_or("created_at", |s| s.field.as_str());
+    let sort_field = match req.sort.as_ref().map(|s| s.field.as_str()) {
+        Some("record_id") => "record_id",
+        Some("template_id") => "template_id",
+        Some("created_by") => "created_by",
+        Some("created_at") => "created_at",
+        _ => "created_at",
+    };
+
     let sort_order = req.sort.as_ref().map_or("DESC", |s| s.order.as_str());
 
     query_builder.push(" ORDER BY ");
-    query_builder.push_bind(sort_field);
+    query_builder.push(sort_field);
     query_builder.push(" ");
     query_builder.push(sort_order);
     query_builder.push(" LIMIT ");

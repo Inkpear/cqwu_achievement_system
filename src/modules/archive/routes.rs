@@ -234,14 +234,6 @@ pub async fn init_upload_session_handler(
         )
     )
 )]
-#[tracing::instrument(
-    name = "获取预签名上传URL",
-    skip(app_state, template_id, req, user),
-    fields(
-        user_id = %user.sub,
-        template_id = %template_id,
-    )
-)]
 #[tracing::instrument(name = "获取预签名上传URL", skip(app_state, req, template_id, user)
     fields(
         user_id = %user.sub,

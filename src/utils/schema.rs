@@ -38,11 +38,12 @@ pub struct SchemaFilter {
 
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 #[derive(Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
 pub enum SchemaFilterOperator {
     EQ,
-    GT,
-    LT,
+    NUMGT,
+    NUMLT,
+    TIMEGT,
+    TIMELT,
     LIKE,
 }
 
@@ -59,19 +60,33 @@ pub fn build_where_clause<'a>(
                 query_builder.push(" = ");
                 query_builder.push_bind(&schema_filter.value);
             }
-            SchemaFilterOperator::GT => {
+            SchemaFilterOperator::NUMGT => {
                 query_builder.push("(archive_record.data ->> ");
                 query_builder.push_bind(&schema_filter.field);
                 query_builder.push(")::numeric > (");
                 query_builder.push_bind(&schema_filter.value);
                 query_builder.push(")::numeric");
             }
-            SchemaFilterOperator::LT => {
+            SchemaFilterOperator::NUMLT => {
                 query_builder.push("(archive_record.data ->> ");
                 query_builder.push_bind(&schema_filter.field);
                 query_builder.push(")::numeric < (");
                 query_builder.push_bind(&schema_filter.value);
                 query_builder.push(")::numeric");
+            }
+            SchemaFilterOperator::TIMEGT => {
+                query_builder.push("(archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(")::timestamptz > (");
+                query_builder.push_bind(&schema_filter.value);
+                query_builder.push(")::timestamptz");
+            }
+            SchemaFilterOperator::TIMELT => {
+                query_builder.push("(archive_record.data ->> ");
+                query_builder.push_bind(&schema_filter.field);
+                query_builder.push(")::timestamptz < (");
+                query_builder.push_bind(&schema_filter.value);
+                query_builder.push(")::timestamptz");
             }
             SchemaFilterOperator::LIKE => {
                 query_builder.push("archive_record.data ->> ");

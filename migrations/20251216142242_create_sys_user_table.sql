@@ -9,7 +9,9 @@ CREATE TABLE sys_user (
     -- 基础信息
     email VARCHAR(100),
     phone VARCHAR(20),
-    avatar_url TEXT,
+    avatar_key VARCHAR(100),
+    major VARCHAR(50),
+    college VARCHAR(50),
 
     -- 状态控制
     is_active BOOLEAN NOT NULL DEFAULT TRUE,

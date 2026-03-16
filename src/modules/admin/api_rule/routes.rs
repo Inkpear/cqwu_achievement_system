@@ -4,17 +4,23 @@ use validator::Validate;
 
 use crate::{
     common::{app_state::AppState, error::AppError, response::AppResponse},
+    domain::HttpMethod,
     middleware::auth::AuthenticatedUser,
     modules::admin::api_rule::{
-        models::{GrantUserApiRuleRequest, QueryUserApiRuleRequest},
+        models::{GrantUserApiRuleRequest, QueryUserApiRuleRequest, RoutesFilter},
         service::{
-            grant_user_api_access_rule, query_user_api_access_rules, revoke_user_api_access_rule,
+            check_api_rule_validity, do_filter_with_prefix, do_filter_with_user_exists_rules,
+            get_registry_routes, grant_user_api_access_rule, query_user_api_access_rules,
+            revoke_user_api_access_rule,
         },
     },
 };
 
 #[cfg(feature = "swagger")]
-use {crate::common::pagination::PageData, crate::modules::admin::api_rule::models::ApiRuleDTO};
+use {
+    crate::common::pagination::PageData, crate::domain::RouteInfo,
+    crate::modules::admin::api_rule::models::ApiRuleDTO,
+};
 
 #[cfg_attr(
     feature = "swagger",
@@ -54,6 +60,8 @@ pub async fn grant_user_api_rule_handler(
     user: AuthenticatedUser,
 ) -> Result<impl Responder, AppError> {
     req.validate().map_err(AppError::ValidationError)?;
+    check_api_rule_validity(&app_state.pool, &req.api_pattern, &req.http_method).await?;
+
     let dto = grant_user_api_access_rule(&app_state.pool, &req, &user.sub).await?;
 
     Ok(AppResponse::created(dto, "授予用户 API 访问规则成功"))
@@ -131,4 +139,40 @@ pub async fn query_user_api_access_rules_handler(
         page_data,
         "查询用户 API 访问规则成功",
     ))
+}
+
+#[cfg_attr(
+    feature = "swagger",
+    utoipa::path(
+        get,
+        path = "/api/admin/api_rule/routes",
+        tag = "管理员-API 访问规则管理",
+        params(
+            ("prefix" = Option<String>, Query, description = "路由前缀过滤"),
+            ("method" = Option<HttpMethod>, Query, description = "HTTP 方法过滤"),
+            ("user_id" = Option<Uuid>, Query, description = "根据用户已有规则过滤"),
+        ),
+        security(
+            ("bearer_auth" = [])
+        ),
+        responses(
+            (status = 200, description = "获取路由路径成功", body = AppResponse<Vec<RouteInfo>>),
+        )
+    )
+)]
+#[tracing::instrument(name = "获取路由路径", skip(app_state, filter))]
+pub async fn get_registry_routes_handler(
+    app_state: web::Data<AppState>,
+    filter: web::Query<RoutesFilter>,
+) -> Result<impl Responder, AppError> {
+    let mut routes = get_registry_routes(&app_state.pool).await?;
+
+    let prefix = filter.prefix.as_deref().unwrap_or("");
+    let method = filter.method.as_ref().unwrap_or(&HttpMethod::ALL);
+    do_filter_with_prefix(&mut routes, prefix, method);
+    if let Some(user_id) = &filter.user_id {
+        do_filter_with_user_exists_rules(&app_state.pool, &mut routes, user_id).await?;
+    }
+
+    Ok(AppResponse::success_msg(routes, "获取路由路径成功"))
 }

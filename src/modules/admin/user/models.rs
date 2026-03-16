@@ -1,8 +1,10 @@
 use crate::common::pagination::{default_page, default_page_size};
 use crate::domain::UserRole;
+use crate::modules::user::models::PHONE_NUMBER;
 use chrono::{DateTime, Utc};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "swagger")]
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -35,16 +37,17 @@ pub struct RegisterUserRequest {
     #[validate(email(message = "邮箱格式不正确"))]
     pub email: Option<String>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "+1234567890"))]
-    #[validate(length(min = 7, max = 15, message = "电话号码长度必须在7-15个字符之间"))]
+    #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
+    #[validate(regex(path = "PHONE_NUMBER", message = "请提供合法的中国大陆手机号"))]
     pub phone: Option<String>,
 
-    #[cfg_attr(
-        feature = "swagger",
-        schema(example = "https://example.com/avatar.png")
-    )]
-    #[validate(url(message = "头像URL格式不正确"))]
-    pub avatar_url: Option<String>,
+    #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]
+    #[validate(length(max = 50, message = "专业名称不能超过50个字符"))]
+    pub major: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "数学与人工智能学院"))]
+    #[validate(length(max = 50, message = "学院名称不能超过50个字符"))]
+    pub college: Option<String>,
 }
 
 pub struct RegisterUser {
@@ -54,7 +57,8 @@ pub struct RegisterUser {
     pub role: UserRole,
     pub email: Option<String>,
     pub phone: Option<String>,
-    pub avatar_url: Option<String>,
+    pub major: Option<String>,
+    pub college: Option<String>,
 }
 
 impl RegisterUser {
@@ -67,7 +71,8 @@ impl RegisterUser {
             role: req.role,
             email: req.email,
             phone: req.phone,
-            avatar_url: req.avatar_url,
+            major: req.major,
+            college: req.college,
         })
     }
 }
@@ -100,14 +105,20 @@ pub struct UserDTO {
     #[cfg_attr(feature = "swagger", schema(example = "user@example.com"))]
     pub email: Option<String>,
 
-    #[cfg_attr(feature = "swagger", schema(example = "+1234567890"))]
+    #[cfg_attr(feature = "swagger", schema(example = "13002326950"))]
     pub phone: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "计算机科学与技术"))]
+    pub major: Option<String>,
+
+    #[cfg_attr(feature = "swagger", schema(example = "数学与人工智能学院"))]
+    pub college: Option<String>,
 
     #[cfg_attr(
         feature = "swagger",
         schema(example = "https://example.com/avatar.png")
     )]
-    pub avatar_url: Option<String>,
+    pub avatar_key: Option<String>,
 
     pub created_at: DateTime<Utc>,
 }
@@ -136,7 +147,7 @@ pub struct QueryUserRequest {
     pub page: i64,
 
     #[cfg_attr(feature = "swagger", schema(example = "10"))]
-    #[validate(range(min = 1, max = 100, message = "每页数量必须在1-100之间"))]
+    #[validate(range(min = 1, message = "每页数量必须大于等于1"))]
     #[serde(default = "default_page_size")]
     pub page_size: i64,
 }

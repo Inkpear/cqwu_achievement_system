@@ -55,7 +55,7 @@ pub struct QueryUserApiRuleRequest {
     #[cfg_attr(feature = "swagger", schema(example = 0, default = 1))]
     pub page: i64,
 
-    #[validate(range(min = 1, max = 100, message = "每页数量必须在1-100之间"))]
+    #[validate(range(min = 1, message = "每页数量必须大于等于1"))]
     #[serde(default = "default_page_size")]
     #[cfg_attr(feature = "swagger", schema(example = 10, default = 10))]
     pub page_size: i64,
@@ -83,4 +83,13 @@ pub struct ApiRuleDTO {
 
     #[cfg_attr(feature = "swagger", schema(example = "系统管理员"))]
     pub granted_by: Option<Uuid>,
+}
+
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[derive(Deserialize)]
+pub struct RoutesFilter {
+    #[cfg_attr(feature = "swagger", schema(example = "/api/admin/user/"))]
+    pub prefix: Option<String>,
+    pub method: Option<HttpMethod>,
+    pub user_id: Option<Uuid>,
 }

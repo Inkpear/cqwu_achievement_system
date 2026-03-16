@@ -74,7 +74,7 @@ async fn create_archive_and_query_success() {
         check_response_code_and_message(&archive_response, 201, "创建归档记录成功");
     }
 
-    let filters = vec![("username", "LIKE", "u%"), ("age", "GT", "26")];
+    let filters = vec![("username", "LIKE", "u%"), ("age", "NUMGT", "26")];
     let body = serde_json::json!({
         "filters": filters.iter().map(|(field, op, value)| {
             serde_json::json!({
@@ -323,7 +323,7 @@ async fn submit_a_invalid_archive_query_missing_400() {
 
     let invalid_query_body = serde_json::json!({
         "filters": [
-            { "field": "field1", "operator": "GT", "value": "value" }
+            { "field": "field1", "operator": "NUMGT", "value": "not_a_number" }
         ]
     });
 
@@ -494,7 +494,7 @@ async fn init_upload_session_and_get_upload_urls_success_and_get_again_returns_4
     check_response_code_and_message(&presigned_response_2, 403, "该字段配额已用完");
 }
 
-async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
+async fn create_a_file_record_return_record_id(app: &mut TestApp) -> (Uuid, Uuid) {
     let template_body = serde_json::json!({
         "name": "文件归档模板",
         "category": "文件收集",
@@ -617,10 +617,12 @@ async fn create_a_file_record_return_record_id(app: &mut TestApp) -> Uuid {
         .expect("Failed to read file content");
     assert_eq!(content, dummy_file_content);
 
-    record_res["data"]["record_id"]
+    let record_id = record_res["data"]["record_id"]
         .as_str()
         .and_then(|id_str| Uuid::parse_str(id_str).ok())
-        .expect("record_id should be a valid UUID")
+        .expect("record_id should be a valid UUID");
+
+    (template_id_uuid, record_id)
 }
 
 #[tokio::test]
@@ -695,10 +697,10 @@ async fn create_a_file_record_and_delete_it_success() {
     let user = TestUser::default_admin(&app.db_pool).await;
     app.login(&user).await;
 
-    let record_id = create_a_file_record_return_record_id(&mut app).await;
+    let (template_id, record_id) = create_a_file_record_return_record_id(&mut app).await;
 
     let delete_res = app
-        .delete_archive_record(&record_id.to_string())
+        .delete_archive_record(&template_id.to_string(), &record_id.to_string())
         .await
         .json::<serde_json::Value>()
         .await
@@ -1232,6 +1234,174 @@ async fn create_a_record_fail_with_fake_session_id() {
 }
 
 #[tokio::test]
+async fn get_archive_template_info_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let body = serde_json::json!({
+        "name": "模板信息测试模板",
+        "category": "接口测试",
+        "description": "用于测试获取模板信息接口",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" }
+                },
+                "required": ["title"]
+            },
+            "instance": { "title": "示例标题" }
+        }
+    });
+
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&create_res, 201, "收集模板创建成功");
+
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    let info_res = app
+        .get_archive_template_info(template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 200, "获取模板信息成功");
+
+    assert_eq!(
+        info_res["data"]["template_id"].as_str().unwrap(),
+        template_id
+    );
+    assert_eq!(
+        info_res["data"]["name"].as_str().unwrap(),
+        "模板信息测试模板"
+    );
+    assert_eq!(info_res["data"]["category"].as_str().unwrap(), "接口测试");
+    assert_eq!(
+        info_res["data"]["description"].as_str().unwrap(),
+        "用于测试获取模板信息接口"
+    );
+    assert!(info_res["data"]["is_active"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn get_archive_template_info_returns_404_for_nonexistent_template() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let fake_template_id = Uuid::new_v4().to_string();
+
+    let info_res = app
+        .get_archive_template_info(&fake_template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 404, "模板不存在");
+}
+
+#[tokio::test]
+async fn get_archive_template_info_returns_403_without_permission() {
+    let mut app = TestApp::spawn().await;
+    let admin_user = TestUser::default_admin(&app.db_pool).await;
+    let mut normal_user = TestUser::new();
+    normal_user.store(&app.db_pool).await;
+
+    app.login(&admin_user).await;
+
+    let body = serde_json::json!({
+        "name": "权限测试模板",
+        "category": "权限测试",
+        "description": "...",
+        "schema": {
+            "schema_def": { "type": "object" },
+            "instance": {}
+        }
+    });
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    app.login(&normal_user).await;
+
+    let info_res = app.get_archive_template_info(template_id).await;
+    assert_eq!(info_res.status().as_u16(), 403);
+}
+
+#[tokio::test]
+async fn get_archive_template_info_success_with_granted_permission() {
+    let mut app = TestApp::spawn().await;
+    let admin_user = TestUser::default_admin(&app.db_pool).await;
+    let mut normal_user = TestUser::new();
+    normal_user.store(&app.db_pool).await;
+
+    app.login(&admin_user).await;
+
+    let body = serde_json::json!({
+        "name": "授权模板信息测试模板",
+        "category": "授权测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "note": { "type": "string" }
+                }
+            },
+            "instance": {}
+        }
+    });
+    let create_res = app
+        .post_create_template(&body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&create_res, 201, "收集模板创建成功");
+    let template_id = create_res["data"]["template_id"].as_str().unwrap();
+
+    let grant_body = serde_json::json!({
+        "user_id": normal_user.user_id.unwrap().to_string(),
+        "api_pattern": format!("/api/archive/{}/", template_id),
+        "http_method": "ALL",
+        "description": "允许访问归档模板接口",
+        "expires_at": null
+    });
+    let grant_res = app
+        .post_grant_user_api_rule(&grant_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&grant_res, 201, "授予用户 API 访问规则成功");
+
+    app.login(&normal_user).await;
+
+    let info_res = app
+        .get_archive_template_info(template_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    check_response_code_and_message(&info_res, 200, "获取模板信息成功");
+    assert_eq!(
+        info_res["data"]["name"].as_str().unwrap(),
+        "授权模板信息测试模板"
+    );
+    assert_eq!(info_res["data"]["category"].as_str().unwrap(), "授权测试");
+}
+
+#[tokio::test]
 async fn create_a_record_and_fuzzy_query_success() {
     let mut app = TestApp::spawn().await;
     let admin_user = TestUser::default_admin(&app.db_pool).await;
@@ -1298,4 +1468,201 @@ async fn create_a_record_and_fuzzy_query_success() {
         record_id,
         "模糊查询结果应包含创建的记录"
     );
+}
+
+#[tokio::test]
+async fn create_archive_and_query_by_timestamp_gt_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "时间筛选测试模板",
+        "category": "测试",
+        "description": "用于测试时间类型 GT 筛选的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "event_date": { "type": "string" }
+                },
+                "required": ["title", "event_date"]
+            },
+            "instance": { "title": "示例", "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let records = [
+        ("早期事件", "2024-01-10T00:00:00Z"),
+        ("中期事件", "2024-06-15T00:00:00Z"),
+        ("晚期事件", "2024-12-25T00:00:00Z"),
+    ];
+    for (title, date) in &records {
+        let record_body = serde_json::json!({
+            "data": { "title": title, "event_date": date }
+        });
+        let res = app
+            .post_create_archive_record(template_id, &record_body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+        check_response_code_and_message(&res, 201, "创建归档记录成功");
+    }
+
+    // GT 2024-03-01 应只返回中期和晚期事件（共 2 条）
+    let query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMEGT", "value": "2024-03-01T00:00:00Z" }
+        ]
+    });
+    let query_res = app
+        .post_query_archive_records(template_id, &query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&query_res, 200, "查询归档记录成功");
+
+    let items = query_res["data"]["items"].as_array().expect("items should be an array");
+    assert_eq!(items.len(), 2, "GT 筛选应返回 2 条时间晚于 2024-03-01 的记录");
+
+    for item in items {
+        let event_date = item["data"]["event_date"].as_str().unwrap();
+        assert!(
+            event_date > "2024-03-01T00:00:00Z",
+            "查询结果中的 event_date ({}) 应晚于 2024-03-01",
+            event_date
+        );
+    }
+}
+
+#[tokio::test]
+async fn create_archive_and_query_by_timestamp_lt_success() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "时间 LT 筛选测试模板",
+        "category": "测试",
+        "description": "用于测试时间类型 LT 筛选的模板",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "event_date": { "type": "string" }
+                },
+                "required": ["title", "event_date"]
+            },
+            "instance": { "title": "示例", "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&template_res, 201, "收集模板创建成功");
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let records = [
+        ("早期事件", "2024-01-10T00:00:00Z"),
+        ("中期事件", "2024-06-15T00:00:00Z"),
+        ("晚期事件", "2024-12-25T00:00:00Z"),
+    ];
+    for (title, date) in &records {
+        let record_body = serde_json::json!({
+            "data": { "title": title, "event_date": date }
+        });
+        let res = app
+            .post_create_archive_record(template_id, &record_body)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+        check_response_code_and_message(&res, 201, "创建归档记录成功");
+    }
+
+    // LT 2024-09-01 应只返回早期和中期事件（共 2 条）
+    let query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMELT", "value": "2024-09-01T00:00:00Z" }
+        ]
+    });
+    let query_res = app
+        .post_query_archive_records(template_id, &query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+    check_response_code_and_message(&query_res, 200, "查询归档记录成功");
+
+    let items = query_res["data"]["items"].as_array().expect("items should be an array");
+    assert_eq!(items.len(), 2, "LT 筛选应返回 2 条时间早于 2024-09-01 的记录");
+
+    for item in items {
+        let event_date = item["data"]["event_date"].as_str().unwrap();
+        assert!(
+            event_date < "2024-09-01T00:00:00Z",
+            "查询结果中的 event_date ({}) 应早于 2024-09-01",
+            event_date
+        );
+    }
+}
+
+#[tokio::test]
+async fn submit_a_invalid_timestamp_archive_query_returns_400() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+    app.login(&user).await;
+
+    let template_body = serde_json::json!({
+        "name": "无效时间查询测试模板",
+        "category": "测试",
+        "description": "...",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "event_date": { "type": "string" }
+                },
+                "required": ["event_date"]
+            },
+            "instance": { "event_date": "2024-01-01T00:00:00Z" }
+        }
+    });
+    let template_res = app
+        .post_create_template(&template_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    let template_id = template_res["data"]["template_id"].as_str().unwrap();
+
+    let invalid_query_body = serde_json::json!({
+        "filters": [
+            { "field": "event_date", "operator": "TIMEGT", "value": "not_a_timestamp" }
+        ]
+    });
+
+    let query_res = app
+        .post_query_archive_records(template_id, &invalid_query_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&query_res, 400, "构造JSON Schema 查询失败");
 }

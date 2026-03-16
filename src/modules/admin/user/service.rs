@@ -7,15 +7,19 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         pagination::PageData,
     },
-    modules::admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
+    modules::{
+        admin::user::models::{QueryUserRequest, RegisterUser, UserDTO},
+        user::service::parse_avatar_key_to_url,
+    },
+    utils::s3_storage::S3Storage,
 };
 
 #[tracing::instrument(name = "保存用户到数据库", skip(pool, user))]
 pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, AppError> {
     let row = sqlx::query!(
         r#"
-            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, avatar_url)
-            VALUES($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO sys_user (username, nickname, password_hash, role, email, phone, major, college)
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING user_id, created_at
         "#,
         user.username,
@@ -24,7 +28,8 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         user.role.as_str(),
         user.email,
         user.phone,
-        user.avatar_url,
+        user.major,
+        user.college,
     )
     .fetch_one(pool)
     .await
@@ -45,8 +50,10 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
         is_active: true,
         email: user.email.clone(),
         phone: user.phone.clone(),
-        avatar_url: user.avatar_url.clone(),
+        major: user.major.clone(),
+        college: user.college.clone(),
         created_at: row.created_at,
+        avatar_key: None,
     };
 
     Ok(dto)
@@ -81,9 +88,10 @@ pub async fn modify_user_status(
     Ok(())
 }
 
-#[tracing::instrument(name = "从数据库查询用户列表", skip(pool, req))]
+#[tracing::instrument(name = "从数据库查询用户列表", skip(pool, req, s3_storage))]
 pub async fn query_users(
     pool: &PgPool,
+    s3_storage: &S3Storage,
     req: &QueryUserRequest,
 ) -> Result<PageData<UserDTO>, AppError> {
     let count_result = sqlx::query!(
@@ -113,7 +121,7 @@ pub async fn query_users(
 
     let total = count_result.count.unwrap_or(0);
 
-    let rows = sqlx::query_as!(
+    let mut rows = sqlx::query_as!(
         UserDTO,
         r#"
         SELECT 
@@ -124,7 +132,9 @@ pub async fn query_users(
             is_active,
             email,
             phone,
-            avatar_url,
+            major,
+            college,
+            avatar_key,
             created_at
         FROM sys_user
         WHERE 
@@ -151,6 +161,13 @@ pub async fn query_users(
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    for user in &mut rows {
+        if let Some(avatar_key) = &user.avatar_key {
+            let view_url = parse_avatar_key_to_url(s3_storage, avatar_key).await?;
+            user.avatar_key = Some(view_url);
+        }
+    }
 
     let page_data = PageData::from(rows, total, req.page, req.page_size);
 
@@ -182,6 +199,29 @@ pub async fn admin_change_user_password(
     }
 
     tracing::info!("用户 {} 的密码已更改", user_id);
+
+    Ok(())
+}
+
+#[tracing::instrument(name = "删除用户至数据库", skip(pool))]
+pub async fn delete_user(pool: &PgPool, user_id: &Uuid) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM sys_user
+        WHERE user_id = $1
+        "#,
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("未找到用户以删除: {}", user_id);
+        return Err(AppError::DataNotFound("用户不存在".into()));
+    }
+
+    tracing::info!("用户 {} 已被删除", user_id);
 
     Ok(())
 }

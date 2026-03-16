@@ -82,6 +82,8 @@ pub async fn query_templates_handler(
     app_state: web::Data<AppState>,
     req: web::Query<QueryTemplatesRequest>,
 ) -> Result<impl Responder, AppError> {
+    req.validate().map_err(AppError::ValidationError)?;
+
     let page_data = query_templates(&app_state.pool, &req.0).await?;
 
     Ok(AppResponse::success_msg(page_data, "查询收集模板成功"))
@@ -147,7 +149,7 @@ pub async fn update_template_handler(
         responses(
             (status = 200, description = "删除收集模板成功",),
             (status = 404, description = "模板不存在"),
-            (status = 409, description = "该模板已有归档记录，无法删除"),
+            (status = 409, description = "存在关联的归档记录，无法删除该模板"),
         )
     )
 )]
@@ -156,6 +158,12 @@ pub async fn delete_template_handler(
     app_state: web::Data<AppState>,
     template_id: web::Path<uuid::Uuid>,
 ) -> Result<impl Responder, AppError> {
+    if check_any_record_exists(&app_state.pool, &template_id).await? {
+        return Err(AppError::DatabaseConflictError(
+            "存在关联的归档记录，无法删除该模板".to_string(),
+        ));
+    }
+
     delete_template(&app_state.pool, template_id.into_inner()).await?;
 
     Ok(AppResponse::ok_msg("收集模板删除成功"))
@@ -190,7 +198,7 @@ pub async fn modify_template_status_handler(
 
 #[cfg_attr(feature = "swagger", utoipa::path(
     get,
-    path = "/api/admin/template/categories",
+    path = "/api/admin/template/all_categories",
     tag = "管理员-模板管理",
     security(
         ("bearer_auth" = [])

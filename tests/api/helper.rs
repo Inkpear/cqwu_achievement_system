@@ -248,6 +248,17 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn delete_user(&self, user_id: &str) -> reqwest::Response {
+        self.api_client
+            .delete(&format!(
+                "{}/api/admin/user/delete/{}",
+                self.address, user_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
     pub async fn delete_template(&self, template_id: &str) -> reqwest::Response {
         self.api_client
             .delete(&format!(
@@ -351,11 +362,26 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn delete_archive_record(&self, record_id: &str) -> reqwest::Response {
+    pub async fn get_archive_template_info(&self, template_id: &str) -> reqwest::Response {
+        self.api_client
+            .get(&format!(
+                "{}/api/archive/{}/info",
+                self.address, template_id
+            ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn delete_archive_record(
+        &self,
+        template_id: &str,
+        record_id: &str,
+    ) -> reqwest::Response {
         self.api_client
             .delete(&format!(
-                "{}/api/archive/{}/delete",
-                self.address, record_id
+                "{}/api/archive/{}/delete/{}",
+                self.address, template_id, record_id
             ))
             .send()
             .await
@@ -368,6 +394,51 @@ impl TestApp {
                 "{}/api/admin/template/all_categories",
                 self.address
             ))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_to_presigned_avatar_url(
+        &self,
+        body: &serde_json::Value,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/api/user/avatar/presigned", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_to_update_avatar(&self, file_id: &str) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/user/avatar/{}", self.address, file_id))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn patch_to_update_user_info(&self, body: &serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .patch(&format!("{}/api/user/update", self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_user_info(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/user/me", self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_user_effective_routes(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/api/user/routes", self.address))
             .send()
             .await
             .expect("Failed to execute request")

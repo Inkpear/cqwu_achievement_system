@@ -29,15 +29,17 @@ pub struct CreateArchiveRecordRequest {
 }
 
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct QueryArchiveRecordsRequest {
     pub filters: Option<Vec<SchemaFilter>>,
 
     pub sort: Option<QuerySort>,
 
+    #[validate(range(min = 1, message = "页码必须大于等于1"))]
     #[serde(default = "default_page")]
     pub page: i64,
 
+    #[validate(range(min = 1, message = "每页数量必须大于等于1"))]
     #[serde(default = "default_page_size")]
     pub page_size: i64,
 }

@@ -19,12 +19,19 @@ use utoipa::{
         crate::modules::admin::user::routes::create_user_handler,
         crate::modules::auth::routes::login_user_handler,
         crate::modules::user::routes::change_password_handler,
+        crate::modules::user::routes::presigned_avatar_url_handler,
+        crate::modules::user::routes::update_avatar_handler,
+        crate::modules::user::routes::get_user_info_handler,
+        crate::modules::user::routes::update_user_info_handler,
+        crate::modules::user::routes::get_user_effective_routes_handler,
         crate::modules::admin::user::routes::modify_user_status_handler,
         crate::modules::admin::api_rule::routes::grant_user_api_rule_handler,
         crate::modules::admin::api_rule::routes::revoke_user_api_rule_handler,
         crate::modules::admin::api_rule::routes::query_user_api_access_rules_handler,
+        crate::modules::admin::api_rule::routes::get_registry_routes_handler,
         crate::modules::admin::user::routes::query_users_handler,
         crate::modules::admin::user::routes::admin_change_user_password_handler,
+        crate::modules::admin::user::routes::admin_delete_user_handler,
         crate::modules::admin::template::routes::create_template_handler,
         crate::modules::admin::template::routes::query_templates_handler,
         crate::modules::admin::template::routes::update_template_handler,
@@ -36,6 +43,7 @@ use utoipa::{
         crate::modules::archive::routes::init_upload_session_handler,
         crate::modules::archive::routes::presigned_upload_url_handler,
         crate::modules::archive::routes::delete_archive_record_handler,
+        crate::modules::archive::routes::get_template_info_handler
     ),
     components(
         schemas(

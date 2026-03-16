@@ -197,16 +197,7 @@ pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
-            if db_code == "23503" {
-                return AppError::DatabaseConflictError(
-                    "存在关联的归档记录，无法删除该模板".to_string(),
-                );
-            }
-        }
-        AppError::UnexpectedError(e.into())
-    })?;
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     if result.rows_affected() == 0 {
         tracing::warn!("未找到要删除的模板: {}", template_id);
@@ -289,7 +280,7 @@ pub async fn check_template_is_enabled(
         Some(record) => {
             if !record.is_active {
                 tracing::warn!("模板 {} 已被禁用", template_id);
-                return Err(AppError::DataNotFound("关联的模板不存在".into()));
+                return Err(AppError::Forbidden("关联的模板已经被禁用".into()));
             }
             Ok(())
         }

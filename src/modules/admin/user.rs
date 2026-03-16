@@ -16,6 +16,45 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route(
                 "/password",
                 web::patch().to(routes::admin_change_user_password_handler),
+            )
+            .route(
+                "/delete/{user_id}",
+                web::delete().to(routes::admin_delete_user_handler),
             ),
+    );
+    register_route();
+}
+
+fn register_route() {
+    let mut registry = crate::domain::ROUTE_REGISTRY.write().unwrap();
+    registry.register_route(
+        crate::domain::HttpMethod::POST,
+        "/api/admin/user/create/",
+        "创建用户",
+        "用户管理",
+    );
+    registry.register_route(
+        crate::domain::HttpMethod::PATCH,
+        "/api/admin/user/modify_status/",
+        "修改用户状态",
+        "用户管理",
+    );
+    registry.register_route(
+        crate::domain::HttpMethod::GET,
+        "/api/admin/user/query/",
+        "查询用户列表",
+        "用户管理",
+    );
+    registry.register_route(
+        crate::domain::HttpMethod::PATCH,
+        "/api/admin/user/password/",
+        "修改用户密码",
+        "用户管理",
+    );
+    registry.register_route(
+        crate::domain::HttpMethod::DELETE,
+        "/api/admin/user/delete/{user_id}/",
+        "删除用户",
+        "用户管理",
     );
 }

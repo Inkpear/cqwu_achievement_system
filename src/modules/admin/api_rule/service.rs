@@ -6,6 +6,7 @@ use crate::{
         error::{AppError, DatabaseErrorCode},
         pagination::PageData,
     },
+    domain::{HttpMethod, ROUTE_REGISTRY, RouteInfo},
     modules::admin::api_rule::models::{
         ApiRuleDTO, GrantUserApiRuleRequest, QueryUserApiRuleRequest,
     },
@@ -94,6 +95,21 @@ pub async fn check_api_rule_conflict(
     Ok(())
 }
 
+pub async fn check_api_rule_validity(
+    pool: &PgPool,
+    prefix: &str,
+    method: &HttpMethod,
+) -> Result<(), AppError> {
+    let mut routes = get_registry_routes(pool).await?;
+    do_filter_with_prefix(&mut routes, prefix, method);
+
+    if routes.is_empty() {
+        Err(AppError::DataNotFound("没有找到匹配的路由".into()))
+    } else {
+        Ok(())
+    }
+}
+
 #[tracing::instrument(name = "从数据库撤销用户 API 访问规则", skip(pool))]
 pub async fn revoke_user_api_access_rule(pool: &PgPool, rule_id: &Uuid) -> Result<(), AppError> {
     let row = sqlx::query!(
@@ -162,4 +178,127 @@ pub async fn query_user_api_access_rules(
     let page_data = PageData::from(rows, total, req.page, req.page_size);
 
     Ok(page_data)
+}
+
+#[tracing::instrument(name = "从数据库中获取路由注册表", skip(pool))]
+pub async fn get_registry_routes(pool: &PgPool) -> Result<Vec<RouteInfo>, AppError> {
+    let rows = sqlx::query!(
+        r#"
+            SELECT template_id, name, category
+            FROM sys_template
+            WHERE is_active = true
+        "#
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    let mut routes = ROUTE_REGISTRY
+        .read()
+        .map_err(|e| AppError::UnexpectedError(anyhow::anyhow!("获取路由注册表锁失败: {}", e)))?
+        .get_routes()
+        .clone();
+
+    for row in rows {
+        let template_routes = build_template_route_info(row.template_id, row.name, row.category);
+        routes.extend(template_routes);
+    }
+    let routes: Vec<RouteInfo> = routes.into_iter().collect();
+
+    Ok(routes)
+}
+
+#[tracing::instrument(name = "获取用户有效的 API 访问规则", skip(pool, user_id))]
+pub async fn get_effective_rules_for_user(
+    pool: &PgPool,
+    user_id: &Uuid,
+) -> Result<Vec<(String, HttpMethod)>, AppError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT api_pattern, http_method
+        FROM sys_access_rule
+        WHERE user_id = $1
+            AND (expires_at IS NULL OR expires_at >= NOW())
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    let rules = rows
+        .into_iter()
+        .map(|row| (row.api_pattern, HttpMethod::from(row.http_method)))
+        .collect();
+
+    Ok(rules)
+}
+
+pub fn do_filter_with_prefix(routes: &mut Vec<RouteInfo>, prefix: &str, method: &HttpMethod) {
+    routes.retain(|route| {
+        route.path.starts_with(prefix) && (route.method == *method || *method == HttpMethod::ALL)
+    });
+}
+
+pub async fn do_filter_with_user_exists_rules(
+    pool: &PgPool,
+    routes: &mut Vec<RouteInfo>,
+    user_id: &Uuid,
+) -> Result<(), AppError> {
+    let user_rules = get_effective_rules_for_user(pool, user_id).await?;
+    routes.retain(|route| {
+        user_rules.iter().all(|(pattern, method)| {
+            !route.path.starts_with(pattern)
+                || (route.method != *method && *method != HttpMethod::ALL)
+        })
+    });
+
+    Ok(())
+}
+
+fn build_template_route_info(template_id: Uuid, name: String, category: String) -> Vec<RouteInfo> {
+    let route_name = format!("{}-{}", category, name);
+    vec![
+        RouteInfo {
+            method: HttpMethod::POST,
+            path: format!("/api/archive/{}/create/", template_id),
+            category: category.clone(),
+            description: format!("{}&用于创建{}", route_name, route_name),
+        },
+        RouteInfo {
+            method: HttpMethod::GET,
+            path: format!("/api/archive/{}/init_upload/", template_id),
+            category: category.clone(),
+            description: format!(
+                "{}&如果{}需要文件， 则用于初始化该模板的上传会话",
+                route_name, route_name
+            ),
+        },
+        RouteInfo {
+            method: HttpMethod::POST,
+            path: format!("/api/archive/{}/presigned/", template_id),
+            category: category.clone(),
+            description: format!(
+                "{}&如果{}需要文件， 则用于获取该模板的预签名上传URL",
+                route_name, route_name
+            ),
+        },
+        RouteInfo {
+            method: HttpMethod::POST,
+            path: format!("/api/archive/{}/query/", template_id),
+            category: category.clone(),
+            description: format!("{}&用于查询{}的归档记录", route_name, route_name),
+        },
+        RouteInfo {
+            method: HttpMethod::DELETE,
+            path: format!("/api/archive/{}/delete/", template_id),
+            category: category.clone(),
+            description: format!("{}&用于删除{}的归档记录", route_name, route_name),
+        },
+        RouteInfo {
+            method: HttpMethod::GET,
+            path: format!("/api/archive/{}/info/", template_id),
+            category: category.clone(),
+            description: format!("{}&用于获取{}的模板信息", route_name, route_name),
+        },
+    ]
 }

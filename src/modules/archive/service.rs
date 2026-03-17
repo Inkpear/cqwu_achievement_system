@@ -203,11 +203,18 @@ pub async fn query_archive_records(
     if let Some(filters) = &req.filters {
         build_where_clause(&mut query_builder, filters);
     }
-    let sort_field = req.sort.as_ref().map_or("created_at", |s| s.field.as_str());
+    let sort_field = match req.sort.as_ref().map(|s| s.field.as_str()) {
+        Some("record_id") => "record_id",
+        Some("template_id") => "template_id",
+        Some("created_by") => "created_by",
+        Some("created_at") => "created_at",
+        _ => "created_at",
+    };
+
     let sort_order = req.sort.as_ref().map_or("DESC", |s| s.order.as_str());
 
     query_builder.push(" ORDER BY ");
-    query_builder.push_bind(sort_field);
+    query_builder.push(sort_field);
     query_builder.push(" ");
     query_builder.push(sort_order);
     query_builder.push(" LIMIT ");
@@ -319,6 +326,48 @@ pub fn check_file_validity(
     Ok(())
 }
 
+const DEDUCT_QUOTA_LUA_SCRIPT: &str = r#"
+    local session_key = KEYS[1]
+    local req_user_id = ARGV[1]
+    local field_name = ARGV[2]
+
+    local session_data = redis.call('GET', session_key)
+    if not session_data then
+        return redis.error_reply("SESSION_NOT_FOUND")
+    end
+
+    local session = cjson.decode(session_data)
+
+    if session.user_id ~= req_user_id then
+        return redis.error_reply("FORBIDDEN_USER")
+    end
+
+    local schema_file_configs = session.schema_file_configs
+    local field_configs = schema_file_configs.configs or schema_file_configs
+
+    local field_config = field_configs[field_name]
+    if not field_config then
+        return redis.error_reply("FIELD_NOT_FOUND")
+    end
+
+    if field_config.quota <= 0 then
+        return redis.error_reply("QUOTA_EXHAUSTED")
+    end
+
+    field_config.quota = field_config.quota - 1
+    field_configs[field_name] = field_config
+
+    if schema_file_configs.configs then
+        schema_file_configs.configs = field_configs
+    else
+        session.schema_file_configs = field_configs
+    end
+
+    redis.call('SETEX', session_key, 1800, cjson.encode(session))
+
+    return cjson.encode(field_config)
+"#;
+
 #[tracing::instrument(
     name = "尝试从redis中获取上传会话中字段的剩余额度",
     skip(redis_cache, session_id, field_name, user_id)
@@ -330,41 +379,37 @@ pub async fn try_to_get_field_quota(
     user_id: &Uuid,
 ) -> Result<SchemaFileFieldConfig, AppError> {
     let session_key = build_upload_session_key(session_id);
-    let mut upload_session: UploadSession = {
-        let session_data = redis_cache
-            .get(&session_key)
-            .await
-            .map_err(|e| AppError::UnexpectedError(e.into()))?
-            .ok_or(AppError::DataNotFound("上传会话不存在或已过期".into()))?;
-        serde_json::from_str(&session_data).map_err(|e| AppError::UnexpectedError(e.into()))?
-    };
+    let user_id_str = user_id.to_string();
 
-    if &upload_session.user_id != user_id {
-        return Err(AppError::Forbidden("无权限使用此上传会话".into()));
+    let keys: &[&str] = &[&session_key];
+    let args: &[&str] = &[&user_id_str, field_name];
+
+    let result: Result<String, anyhow::Error> = redis_cache
+        .execute_script(DEDUCT_QUOTA_LUA_SCRIPT, keys, args)
+        .await;
+
+    match result {
+        Ok(json_str) => {
+            let config: SchemaFileFieldConfig =
+                serde_json::from_str(&json_str).map_err(|e| AppError::UnexpectedError(e.into()))?;
+            Ok(config)
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+
+            if err_msg.contains("SESSION_NOT_FOUND") {
+                Err(AppError::DataNotFound("上传会话不存在或已过期".into()))
+            } else if err_msg.contains("FORBIDDEN_USER") {
+                Err(AppError::Forbidden("无权限使用此上传会话".into()))
+            } else if err_msg.contains("FIELD_NOT_FOUND") {
+                Err(AppError::DataNotFound("上传字段不存在".into()))
+            } else if err_msg.contains("QUOTA_EXHAUSTED") {
+                Err(AppError::Forbidden("该字段配额已用完".into()))
+            } else {
+                Err(AppError::UnexpectedError(e))
+            }
+        }
     }
-
-    let file_config = upload_session
-        .schema_file_configs
-        .get_mut(field_name)
-        .ok_or(AppError::DataNotFound("上传字段不存在".into()))?;
-
-    let result = if file_config.quota == 0 {
-        Err(AppError::Forbidden("该字段配额已用完".into()))
-    } else {
-        file_config.quota -= 1;
-        Ok(file_config.clone())
-    };
-
-    redis_cache
-        .set_ex(
-            &session_key,
-            &serde_json::to_string(&upload_session)
-                .map_err(|e| AppError::UnexpectedError(e.into()))?,
-            1800,
-        )
-        .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
-    result
 }
 
 #[tracing::instrument(name = "从对象数据库获取上传文件的元数据", skip(s3_storage))]

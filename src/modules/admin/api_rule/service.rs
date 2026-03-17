@@ -142,7 +142,7 @@ pub async fn query_user_api_access_rules(
         r#"
         SELECT COUNT(*) as count
         FROM sys_access_rule
-        WHERE user_id = $1
+        WHERE ($1::uuid IS NULL OR user_id = $1)
         "#,
         req.user_id
     )

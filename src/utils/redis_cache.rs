@@ -2,6 +2,7 @@ use deadpool_redis::{
     Connection, Pool, PoolError, Runtime,
     redis::{AsyncTypedCommands, ToRedisArgs},
 };
+use redis::{FromRedisValue, Script};
 
 use crate::configuration::RedisSettings;
 
@@ -21,6 +22,28 @@ impl RedisCache {
 
     async fn get_client(&self) -> Result<Connection, PoolError> {
         self.client.get().await
+    }
+
+    pub async fn execute_script<K, A, R>(
+        &self,
+        script_str: &str,
+        keys: &[K],
+        args: &[A],
+    ) -> Result<R, anyhow::Error>
+    where
+        K: ToRedisArgs,
+        A: ToRedisArgs,
+        R: FromRedisValue,
+    {
+        let mut conn = self.get_client().await?;
+
+        let result: R = Script::new(script_str)
+            .key(keys)
+            .arg(args)
+            .invoke_async(&mut conn)
+            .await?;
+
+        Ok(result)
     }
 
     pub async fn set_ex<K, V>(&self, key: &K, value: &V, exp: u64) -> Result<(), anyhow::Error>

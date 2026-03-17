@@ -512,6 +512,154 @@ async fn create_a_template_and_update_it_success() {
 }
 
 #[tokio::test]
+async fn update_template_after_deleting_records_invalidates_warmed_schema_cache() {
+    let mut app = TestApp::spawn().await;
+    let user = TestUser::default_admin(&app.db_pool).await;
+
+    app.login(&user).await;
+
+    let create_body = serde_json::json!({
+        "name": "缓存失效回归模板",
+        "category": "测试",
+        "description": "用于测试删除归档记录后更新模板的缓存失效",
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    },
+                    "age": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "required": ["username", "age"],
+                "additionalProperties": false
+            }
+        }
+    });
+
+    let create_response = app
+        .post_create_template(&create_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&create_response, 201, "收集模板创建成功");
+
+    let template_id = create_response["data"]["template_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let valid_archive_body = serde_json::json!({
+        "data": {
+            "username": "alice",
+            "age": 20
+        }
+    });
+
+    let record_response = app
+        .post_create_archive_record(&template_id, &valid_archive_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&record_response, 201, "创建归档记录成功");
+
+    let record_id = record_response["data"]["record_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let delete_record_response = app
+        .delete_archive_record(&template_id, &record_id)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&delete_record_response, 200, "删除归档记录成功");
+
+    let update_body = serde_json::json!({
+        "template_id": template_id,
+        "schema": {
+            "schema_def": {
+                "type": "object",
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    }
+                },
+                "required": ["username"],
+                "additionalProperties": false
+            }
+        }
+    });
+
+    let update_response = app
+        .patch_update_template(&update_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&update_response, 200, "收集模板更新成功");
+
+    let stale_archive_body = serde_json::json!({
+        "data": {
+            "username": "bob",
+            "age": 21
+        }
+    });
+
+    let stale_archive_response = app
+        .post_create_archive_record(&template_id, &stale_archive_body)
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&stale_archive_response, 400, "参数校验失败");
+
+    let validation_errors = stale_archive_response["data"]["errors"]["data"]
+        .as_array()
+        .expect("data validation errors should be an array");
+    let validation_message = validation_errors[0]
+        .as_str()
+        .expect("validation error message should be a string");
+
+    assert!(
+        validation_message.contains("Schema校验失败"),
+        "validation message should indicate schema validation failure: {validation_message}"
+    );
+    assert!(
+        validation_message.contains("age"),
+        "validation message should mention the removed field: {validation_message}"
+    );
+
+    let query_response = app
+        .post_query_archive_records(&template_id, &serde_json::json!({}))
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("Failed to parse JSON response");
+
+    check_response_code_and_message(&query_response, 200, "查询归档记录成功");
+    assert_eq!(query_response["data"]["total"], 0);
+    assert_eq!(
+        query_response["data"]["items"]
+            .as_array()
+            .expect("items should be an array")
+            .len(),
+        0
+    );
+}
+
+#[tokio::test]
 async fn create_a_template_and_delete_it_then_can_not_query_it() {
     let mut app = TestApp::spawn().await;
     let user = TestUser::default_admin(&app.db_pool).await;

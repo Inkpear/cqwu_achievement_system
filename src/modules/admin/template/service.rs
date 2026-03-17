@@ -6,6 +6,7 @@ use crate::{
     modules::admin::template::models::{
         CreateTemplateRequest, QueryTemplatesRequest, TemplateDTO, UpdateTemplateRequest,
     },
+    utils::schema::SchemaContextCache,
 };
 
 #[tracing::instrument(name = "插入模板到数据库", skip(pool, req))]
@@ -124,9 +125,10 @@ pub async fn query_templates(
     Ok(page_data)
 }
 
-#[tracing::instrument(name = "更新数据库中的模板", skip(pool, req))]
+#[tracing::instrument(name = "更新数据库中的模板", skip(pool, req, schema_cache))]
 pub async fn update_template(
     pool: &PgPool,
+    schema_cache: &SchemaContextCache,
     username: &str,
     mut req: UpdateTemplateRequest,
 ) -> Result<TemplateDTO, AppError> {
@@ -171,6 +173,8 @@ pub async fn update_template(
 
     tracing::info!("用户 {} 更新了模板 {}", username, req.template_id);
 
+    clear_template_cache(schema_cache, &req.template_id).await;
+
     let dto = TemplateDTO {
         template_id: row.template_id,
         name: row.name,
@@ -186,8 +190,8 @@ pub async fn update_template(
     Ok(dto)
 }
 
-#[tracing::instrument(name = "从数据库中删除模板", skip(pool))]
-pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(), AppError> {
+#[tracing::instrument(name = "从数据库中删除模板", skip(pool, schema_cache))]
+pub async fn delete_template(pool: &PgPool, schema_cache: &SchemaContextCache, template_id: uuid::Uuid) -> Result<(), AppError> {
     let result = sqlx::query!(
         r#"
         DELETE FROM sys_template
@@ -205,6 +209,7 @@ pub async fn delete_template(pool: &PgPool, template_id: uuid::Uuid) -> Result<(
     }
 
     tracing::info!("模板已删除: {}", template_id);
+    clear_template_cache(schema_cache, &template_id).await;
 
     Ok(())
 }
@@ -258,6 +263,12 @@ pub async fn check_any_record_exists(
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
     Ok(row.exists)
+}
+
+#[tracing::instrument(name = "清除模板缓存", skip(schema_cache))]
+pub async fn clear_template_cache(schema_cache: &SchemaContextCache, template_id: &uuid::Uuid) {
+    schema_cache.remove(template_id);
+    tracing::info!("已清除模板 {} 的缓存", template_id);
 }
 
 pub async fn check_template_is_enabled(

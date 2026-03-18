@@ -191,7 +191,11 @@ pub async fn update_template(
 }
 
 #[tracing::instrument(name = "从数据库中删除模板", skip(pool, schema_cache))]
-pub async fn delete_template(pool: &PgPool, schema_cache: &SchemaContextCache, template_id: uuid::Uuid) -> Result<(), AppError> {
+pub async fn delete_template(
+    pool: &PgPool,
+    schema_cache: &SchemaContextCache,
+    template_id: uuid::Uuid,
+) -> Result<(), AppError> {
     let result = sqlx::query!(
         r#"
         DELETE FROM sys_template

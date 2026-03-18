@@ -10,8 +10,9 @@ use crate::{
         archive::{
             models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
             service::{
-                check_file_validity, check_need_file, check_session_exists_and_delete_it,
+                check_file_validity, check_need_file, check_upload_session_exists,
                 create_archive_record, create_files_record, delete_archive_record_by_id,
+                delete_files_by_object_keys, delete_upload_session,
                 enrich_archive_records_with_urls, get_or_load_template_context,
                 get_template_info_by_id, init_upload_session, presigned_upload_url,
                 query_archive_records, try_to_get_field_quota, validate_instance_by_id,
@@ -80,11 +81,8 @@ pub async fn create_archive_record_handler(
     let has_files = schema_context.file_field_configs.is_some() && req.session_id.is_some();
 
     if has_files {
-        check_session_exists_and_delete_it(
-            &app_state.redis_cache,
-            req.session_id.as_ref().unwrap(),
-        )
-        .await?;
+        check_upload_session_exists(&app_state.redis_cache, req.session_id.as_ref().unwrap())
+            .await?;
         create_files_record(
             &app_state.s3_storage,
             &mut tx,
@@ -100,6 +98,10 @@ pub async fn create_archive_record_handler(
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if let Some(session_id) = req.session_id {
+        delete_upload_session(&app_state.redis_cache, &session_id).await?;
+    }
 
     let record = if has_files {
         let mut record_vec = vec![record];
@@ -304,11 +306,13 @@ pub async fn delete_archive_record_handler(
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
-    delete_archive_record_by_id(&mut tx, &app_state.s3_storage, &template_id, &record_id).await?;
+    let object_keys = delete_archive_record_by_id(&mut tx, &template_id, &record_id).await?;
 
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    delete_files_by_object_keys(&app_state.s3_storage, &object_keys).await?;
 
     Ok(AppResponse::ok_msg("删除归档记录成功"))
 }

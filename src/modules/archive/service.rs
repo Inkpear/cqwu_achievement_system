@@ -628,6 +628,8 @@ async fn process_single_file(
     let source_key = build_temp_object_key(session_id, file_id);
     let dest_key = build_archive_dest_key(record_id, file_id);
     let file_metadata = get_file_metadata(s3_storage, &source_key).await?;
+
+    move_temp_file_to_save(s3_storage, &source_key, &dest_key).await?;
     save_file_metadata(
         pool,
         record_id,
@@ -637,7 +639,6 @@ async fn process_single_file(
         user_id,
     )
     .await?;
-    move_temp_file_to_save(s3_storage, &source_key, &dest_key).await?;
 
     Ok(source_key)
 }
@@ -732,8 +733,8 @@ pub async fn enrich_archive_records_with_urls(
     Ok(())
 }
 
-#[tracing::instrument(name = "检查上传会话是否存在并移除", skip(redis_cache, session_id))]
-pub async fn check_session_exists_and_delete_it(
+#[tracing::instrument(name = "检查上传会话有效性", skip(redis_cache, session_id))]
+pub async fn check_upload_session_exists(
     redis_cache: &RedisCache,
     session_id: &Uuid,
 ) -> Result<(), AppError> {
@@ -745,20 +746,29 @@ pub async fn check_session_exists_and_delete_it(
     if !exists {
         return Err(AppError::DataNotFound("上传会话不存在或已过期".into()));
     }
+    Ok(())
+}
+
+#[tracing::instrument(name = "从redis中删除上传会话", skip(redis_cache, session_id))]
+pub async fn delete_upload_session(
+    redis_cache: &RedisCache,
+    session_id: &Uuid,
+) -> Result<(), AppError> {
+    let session_key = build_upload_session_key(session_id);
     redis_cache
         .del(&session_key)
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    tracing::info!("已删除上传会话: {}", session_id);
     Ok(())
 }
 
-#[tracing::instrument(name = "通过记录ID删除归档记录", skip(pool, s3_storage, record_id))]
+#[tracing::instrument(name = "通过记录ID删除数据库中的归档记录", skip(pool, record_id))]
 pub async fn delete_archive_record_by_id(
     pool: &mut Transaction<'_, Postgres>,
-    s3_storage: &S3Storage,
     template_id: &Uuid,
     record_id: &Uuid,
-) -> Result<(), AppError> {
+) -> Result<Vec<String>, AppError> {
     let object_keys = sqlx::query!(
         r#"
         SELECT object_key
@@ -795,14 +805,23 @@ pub async fn delete_archive_record_by_id(
         .map(|row| row.object_key)
         .collect::<Vec<String>>();
 
+    tracing::info!("归档记录已从数据库中删除: {}", record_id);
+
+    Ok(object_keys)
+}
+
+#[tracing::instrument(name = "根据对象键在S3中删除文件", skip(s3_storage, object_keys))]
+pub async fn delete_files_by_object_keys(
+    s3_storage: &S3Storage,
+    object_keys: &[String],
+) -> Result<(), AppError> {
     for object_key in object_keys {
         s3_storage
-            .delete_object(&object_key)
+            .delete_object(object_key)
             .await
             .map_err(|e| AppError::UnexpectedError(e.into()))?;
     }
 
-    tracing::info!("归档记录已删除: {}", record_id);
     Ok(())
 }
 

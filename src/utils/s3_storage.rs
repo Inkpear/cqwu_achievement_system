@@ -152,7 +152,7 @@ impl S3Storage {
                 HeadObjectError::NotFound(_) => Ok(false),
                 other => Err(anyhow::anyhow!(
                     "检查对象是否存在时发生错误: {}",
-                    other.to_string()
+                    other
                 )),
             },
         }

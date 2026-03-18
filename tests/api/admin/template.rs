@@ -314,7 +314,7 @@ async fn query_templates_by_name() {
 
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
-    assert!(list.len() >= 1);
+    assert!(!list.is_empty());
     assert!(
         list.iter()
             .any(|item| item["name"].as_str().unwrap().contains("特殊查询"))
@@ -366,7 +366,7 @@ async fn query_templates_by_category() {
 
     let data = &response["data"];
     let list = data["items"].as_array().unwrap();
-    assert!(list.len() >= 1);
+    assert!(!list.is_empty());
     for item in list {
         assert_eq!(item["category"], "分类A");
     }

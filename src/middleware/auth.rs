@@ -69,8 +69,8 @@ pub async fn mw_authentication(
     let jwt_config = &app_state.jwt_config;
     let claims = check_token(jwt_config, token)?;
 
-    tracing::Span::current().record("user_id", &tracing::field::display(claims.sub));
-    tracing::Span::current().record("username", &tracing::field::display(&claims.username));
+    tracing::Span::current().record("user_id", tracing::field::display(claims.sub));
+    tracing::Span::current().record("username", tracing::field::display(&claims.username));
 
     check_user_enabled(&app_state.pool, &claims).await?;
     if let UserRole::USER = claims.role {
@@ -128,7 +128,7 @@ fn check_token(jwt_config: &JwtConfig, token: &str) -> Result<Claims, AppError> 
 
 #[tracing::instrument(name = "提取令牌", skip(req))]
 fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
-    Ok(req
+    req
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
@@ -136,7 +136,7 @@ fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
         .ok_or_else(|| {
             tracing::warn!("无法提取令牌");
             AppError::Unauthorized
-        })?)
+        })
 }
 
 #[tracing::instrument(name = "检查用户权限", skip(pool))]

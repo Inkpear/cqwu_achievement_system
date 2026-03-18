@@ -14,6 +14,12 @@ pub struct TemplateSchemaContext {
 
 pub struct SchemaContextCache(DashMap<uuid::Uuid, Arc<TemplateSchemaContext>>);
 
+impl Default for SchemaContextCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SchemaContextCache {
     pub fn new() -> Self {
         Self(DashMap::new())

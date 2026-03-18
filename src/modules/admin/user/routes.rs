@@ -59,7 +59,7 @@ pub async fn create_user_handler(
 
     let user = store_user(&app_state.pool, &user).await?;
 
-    tracing::Span::current().record("user_id", &tracing::field::display(user.user_id));
+    tracing::Span::current().record("user_id", tracing::field::display(user.user_id));
 
     Ok(AppResponse::created(user, "创建用户成功"))
 }

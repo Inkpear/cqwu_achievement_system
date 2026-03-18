@@ -74,6 +74,8 @@ pub struct Application {
 
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     PgPoolOptions::new()
+        .max_connections(configuration.max_connections.unwrap_or(32))
+        .min_connections(configuration.min_connections.unwrap_or(5))
         .acquire_timeout(std::time::Duration::from_secs(2))
         .connect_lazy_with(configuration.with_db())
 }

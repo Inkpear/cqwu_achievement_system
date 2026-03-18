@@ -38,11 +38,10 @@ pub async fn grant_user_api_access_rule(
     .fetch_one(pool)
     .await
     .map_err(|e| {
-        if let Some(db_error) = e.as_database_error() {
-            if Some(DatabaseErrorCode::FOREIGN_KEY_VIOLATION).eq(&db_error.code().as_deref()) {
+        if let Some(db_error) = e.as_database_error()
+            && Some(DatabaseErrorCode::FOREIGN_KEY_VIOLATION).eq(&db_error.code().as_deref()) {
                 return AppError::DataNotFound("用户不存在".into());
             }
-        }
         AppError::UnexpectedError(e.into())
     })?;
 

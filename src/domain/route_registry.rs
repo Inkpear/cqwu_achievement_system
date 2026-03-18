@@ -46,6 +46,12 @@ pub struct RouteRegistry {
     routes: BTreeSet<RouteInfo>,
 }
 
+impl Default for RouteRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RouteRegistry {
     pub fn new() -> Self {
         Self {

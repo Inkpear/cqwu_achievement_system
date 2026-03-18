@@ -11,6 +11,8 @@ pub struct DatabaseSettings {
     pub host: String,
     pub database_name: String,
     pub require_ssl: bool,
+    pub max_connections: Option<u32>,
+    pub min_connections: Option<u32>,
 }
 
 impl DatabaseSettings {
@@ -25,7 +27,7 @@ impl DatabaseSettings {
             .host(&self.host)
             .port(self.port)
             .username(&self.username)
-            .password(&self.password.expose_secret())
+            .password(self.password.expose_secret())
             .ssl_mode(ssl_model)
     }
 

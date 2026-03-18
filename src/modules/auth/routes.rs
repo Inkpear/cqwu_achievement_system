@@ -35,7 +35,7 @@ pub async fn login_user_handler(
             .await
             .map_err(|_| AppError::LoginFailed)?;
 
-    tracing::Span::current().record("user_id", &tracing::field::display(user_id));
+    tracing::Span::current().record("user_id", tracing::field::display(user_id));
 
     let jwt = generate_jwt(&app_state.jwt_config, user_id, &login_form.username, role).await?;
 

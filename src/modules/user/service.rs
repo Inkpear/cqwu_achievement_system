@@ -62,7 +62,7 @@ pub async fn presigned_avatar_url(
             filename,
         )
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
 
     Ok(PresignedAvatarUrlResponse { url, file_id })
 }
@@ -84,15 +84,15 @@ pub async fn store_user_avatar(
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
     let file_metadata = FileMetadata::try_from_head(&object_head)
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
     s3_storage
         .copy_source_to_dest(source_key, dest_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
     s3_storage
         .delete_object(source_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
 
     Ok(file_metadata)
 }
@@ -150,7 +150,7 @@ pub async fn parse_avatar_key_to_url(
     let view_url = s3_storage
         .generate_view_url(file_name, object_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
 
     Ok(view_url)
 }

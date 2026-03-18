@@ -74,7 +74,7 @@ async fn create_archive_and_query_success() {
         check_response_code_and_message(&archive_response, 201, "创建归档记录成功");
     }
 
-    let filters = vec![("username", "LIKE", "u%"), ("age", "NUMGT", "26")];
+    let filters = [("username", "LIKE", "u%"), ("age", "NUMGT", "26")];
     let body = serde_json::json!({
         "filters": filters.iter().map(|(field, op, value)| {
             serde_json::json!({
@@ -769,7 +769,7 @@ async fn create_multiple_file_records_success() {
     let session_id = Uuid::parse_str(session_id).unwrap();
     let mut photos_ids = Vec::new();
     for i in 0..3 {
-        let dummy_file_content = generate_a_dummy_file_content(1 * 1024 * 1024);
+        let dummy_file_content = generate_a_dummy_file_content(1024 * 1024);
         let filename = format!("photo_{}.jpg", i + 1);
         let content_type = mime_guess::from_path(&filename)
             .first_or_octet_stream()
@@ -1010,7 +1010,7 @@ async fn create_a_records_fail_with_a_not_exists_file_id() {
     let session_id = Uuid::parse_str(session_id).unwrap();
     let mut photos_ids = Vec::new();
     for i in 0..3 {
-        let dummy_file_content = generate_a_dummy_file_content(1 * 1024 * 1024);
+        let dummy_file_content = generate_a_dummy_file_content(1024 * 1024);
         let filename = format!("photo_{}.jpg", i + 1);
         let content_type = mime_guess::from_path(&filename)
             .first_or_octet_stream()
@@ -1118,7 +1118,7 @@ async fn create_a_records_fail_with_invalid_file_id() {
     let session_id = Uuid::parse_str(session_id).unwrap();
     let mut photos_ids = Vec::new();
     for i in 0..3 {
-        let dummy_file_content = generate_a_dummy_file_content(1 * 1024 * 1024);
+        let dummy_file_content = generate_a_dummy_file_content(1024 * 1024);
         let filename = format!("photo_{}.jpg", i + 1);
         let content_type = mime_guess::from_path(&filename)
             .first_or_octet_stream()
@@ -1455,7 +1455,7 @@ async fn create_a_record_and_fuzzy_query_success() {
         ]
     });
     let query_res = app
-        .post_query_archive_records(&template_id.to_string(), &query_body)
+        .post_query_archive_records(template_id, &query_body)
         .await
         .json::<serde_json::Value>()
         .await

@@ -70,7 +70,7 @@ impl TestApp {
 
         let port = application.port();
 
-        let _ = tokio::spawn(application.run_until_stopped());
+        tokio::spawn(application.run_until_stopped());
 
         TestApp {
             address,
@@ -84,7 +84,7 @@ impl TestApp {
 
     pub async fn post_create_user(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/admin/user/create", self.address))
+            .post(format!("{}/api/admin/user/create", self.address))
             .json(body)
             .send()
             .await
@@ -93,7 +93,7 @@ impl TestApp {
 
     pub async fn post_login<Body: serde::Serialize>(&self, form: &Body) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/auth/login", self.address))
+            .post(format!("{}/api/auth/login", self.address))
             .form(form)
             .send()
             .await
@@ -130,7 +130,7 @@ impl TestApp {
         body: &Body,
     ) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/user/password", self.address))
+            .patch(format!("{}/api/user/password", self.address))
             .json(body)
             .send()
             .await
@@ -139,7 +139,7 @@ impl TestApp {
 
     pub async fn patch_modify_user_status(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/admin/user/modify_status", self.address))
+            .patch(format!("{}/api/admin/user/modify_status", self.address))
             .json(body)
             .send()
             .await
@@ -148,7 +148,7 @@ impl TestApp {
 
     pub async fn post_grant_user_api_rule(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/admin/api_rule/grant", self.address))
+            .post(format!("{}/api/admin/api_rule/grant", self.address))
             .json(body)
             .send()
             .await
@@ -157,7 +157,7 @@ impl TestApp {
 
     pub async fn delete_revoke_user_api_rule(&self, rule_id: &str) -> reqwest::Response {
         self.api_client
-            .delete(&format!(
+            .delete(format!(
                 "{}/api/admin/api_rule/revoke/{}",
                 self.address, rule_id
             ))
@@ -174,7 +174,7 @@ impl TestApp {
     ) -> reqwest::Response {
         let mut request = self
             .api_client
-            .get(&format!("{}/api/admin/api_rule/query", self.address));
+            .get(format!("{}/api/admin/api_rule/query", self.address));
 
         if let Some(uid) = user_id {
             request = request.query(&[("user_id", uid)]);
@@ -187,7 +187,7 @@ impl TestApp {
 
     pub async fn get_query_user(&self, user_id: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .get(&format!("{}/api/admin/user/query", self.address))
+            .get(format!("{}/api/admin/user/query", self.address))
             .query(user_id)
             .send()
             .await
@@ -196,7 +196,7 @@ impl TestApp {
 
     pub async fn patch_change_user_password(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/admin/user/password", self.address))
+            .patch(format!("{}/api/admin/user/password", self.address))
             .json(body)
             .send()
             .await
@@ -205,7 +205,7 @@ impl TestApp {
 
     pub async fn post_create_template(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/admin/template/create", self.address))
+            .post(format!("{}/api/admin/template/create", self.address))
             .json(body)
             .send()
             .await
@@ -222,7 +222,7 @@ impl TestApp {
     ) -> reqwest::Response {
         let mut request = self
             .api_client
-            .get(&format!("{}/api/admin/template/query", self.address));
+            .get(format!("{}/api/admin/template/query", self.address));
 
         if let Some(id) = template_id {
             request = request.query(&[("template_id", id)]);
@@ -241,7 +241,7 @@ impl TestApp {
 
     pub async fn patch_update_template(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/admin/template/update", self.address))
+            .patch(format!("{}/api/admin/template/update", self.address))
             .json(body)
             .send()
             .await
@@ -250,7 +250,7 @@ impl TestApp {
 
     pub async fn delete_user(&self, user_id: &str) -> reqwest::Response {
         self.api_client
-            .delete(&format!(
+            .delete(format!(
                 "{}/api/admin/user/delete/{}",
                 self.address, user_id
             ))
@@ -261,7 +261,7 @@ impl TestApp {
 
     pub async fn delete_template(&self, template_id: &str) -> reqwest::Response {
         self.api_client
-            .delete(&format!(
+            .delete(format!(
                 "{}/api/admin/template/delete/{}",
                 self.address, template_id
             ))
@@ -275,7 +275,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .patch(&format!(
+            .patch(format!(
                 "{}/api/admin/template/modify_status",
                 self.address
             ))
@@ -291,7 +291,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .post(&format!(
+            .post(format!(
                 "{}/api/archive/{}/create",
                 self.address, template_id
             ))
@@ -307,7 +307,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .post(&format!(
+            .post(format!(
                 "{}/api/archive/{}/query",
                 self.address, template_id
             ))
@@ -319,7 +319,7 @@ impl TestApp {
 
     pub async fn get_init_upload_session(&self, template_id: &str) -> reqwest::Response {
         self.api_client
-            .get(&format!(
+            .get(format!(
                 "{}/api/archive/{}/init_upload",
                 self.address, template_id
             ))
@@ -334,7 +334,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .post(&format!(
+            .post(format!(
                 "{}/api/archive/{}/presigned",
                 self.address, template_id
             ))
@@ -347,7 +347,7 @@ impl TestApp {
     pub async fn put_to_upload_file(
         &self,
         upload_url: &str,
-        file_content: &Vec<u8>,
+        file_content: &[u8],
         content_type: &str,
         filename: &str,
     ) -> reqwest::Response {
@@ -356,7 +356,7 @@ impl TestApp {
             .put(upload_url)
             .header("Content-Type", content_type)
             .header("x-amz-meta-original-filename", filename.as_ref())
-            .body(file_content.clone())
+            .body(file_content.to_vec())
             .send()
             .await
             .expect("Failed to execute request")
@@ -364,7 +364,7 @@ impl TestApp {
 
     pub async fn get_archive_template_info(&self, template_id: &str) -> reqwest::Response {
         self.api_client
-            .get(&format!(
+            .get(format!(
                 "{}/api/archive/{}/info",
                 self.address, template_id
             ))
@@ -379,7 +379,7 @@ impl TestApp {
         record_id: &str,
     ) -> reqwest::Response {
         self.api_client
-            .delete(&format!(
+            .delete(format!(
                 "{}/api/archive/{}/delete/{}",
                 self.address, template_id, record_id
             ))
@@ -390,7 +390,7 @@ impl TestApp {
 
     pub async fn get_all_template_categories(&self) -> reqwest::Response {
         self.api_client
-            .get(&format!(
+            .get(format!(
                 "{}/api/admin/template/all_categories",
                 self.address
             ))
@@ -404,7 +404,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/api/user/avatar/presigned", self.address))
+            .post(format!("{}/api/user/avatar/presigned", self.address))
             .json(body)
             .send()
             .await
@@ -413,7 +413,7 @@ impl TestApp {
 
     pub async fn patch_to_update_avatar(&self, file_id: &str) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/user/avatar/{}", self.address, file_id))
+            .patch(format!("{}/api/user/avatar/{}", self.address, file_id))
             .send()
             .await
             .expect("Failed to execute request")
@@ -421,7 +421,7 @@ impl TestApp {
 
     pub async fn patch_to_update_user_info(&self, body: &serde_json::Value) -> reqwest::Response {
         self.api_client
-            .patch(&format!("{}/api/user/update", self.address))
+            .patch(format!("{}/api/user/update", self.address))
             .json(body)
             .send()
             .await
@@ -430,7 +430,7 @@ impl TestApp {
 
     pub async fn get_user_info(&self) -> reqwest::Response {
         self.api_client
-            .get(&format!("{}/api/user/me", self.address))
+            .get(format!("{}/api/user/me", self.address))
             .send()
             .await
             .expect("Failed to execute request")
@@ -438,7 +438,7 @@ impl TestApp {
 
     pub async fn get_user_effective_routes(&self) -> reqwest::Response {
         self.api_client
-            .get(&format!("{}/api/user/routes", self.address))
+            .get(format!("{}/api/user/routes", self.address))
             .send()
             .await
             .expect("Failed to execute request")
@@ -518,6 +518,12 @@ impl TestUser {
     }
 }
 
+impl Default for TestUser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect_with(&config.without_db())
         .await
@@ -540,17 +546,34 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
+#[track_caller]
 pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, msg: &str) {
+    let actual_code = response
+        .get("code")
+        .and_then(|v| v.as_u64())
+        .unwrap_or_else(|| panic!("response.code is missing or not u64\nresponse = {:#?}", response));
+
+    let actual_message = response
+        .get("message")
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| {
+            panic!(
+                "response.message is missing or not string\nresponse = {:#?}",
+                response
+            )
+        });
+
     assert_eq!(
-        response["code"].as_u64().unwrap(),
-        code,
-        "code not match in\nresponse = {:#?}",
-        response
+        actual_code, code,
+        "unexpected response code\nexpected: {}\nactual: {}\nresponse = {:#?}",
+        code, actual_code, response
     );
+
     assert!(
-        response["message"].as_str().unwrap().contains(msg),
-        "message: {} is not match in\nresponse = {:#?}",
+        actual_message.contains(msg),
+        "unexpected response message\nexpected to contain: {:?}\nactual: {:?}\nresponse = {:#?}",
         msg,
+        actual_message,
         response
     );
 }

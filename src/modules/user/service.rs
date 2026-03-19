@@ -83,8 +83,8 @@ pub async fn store_user_avatar(
         .get_head_object_output(source_key)
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
-    let file_metadata = FileMetadata::try_from_head(&object_head)
-        .map_err(AppError::UnexpectedError)?;
+    let file_metadata =
+        FileMetadata::try_from_head(&object_head).map_err(AppError::UnexpectedError)?;
     s3_storage
         .copy_source_to_dest(source_key, dest_key)
         .await

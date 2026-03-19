@@ -126,9 +126,10 @@ pub async fn create_archive_record(
     .await
     .map_err(|e| {
         if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code())
-            && db_code == DatabaseErrorCode::FOREIGN_KEY_VIOLATION {
-                return AppError::DataNotFound("关联的模板不存在".into());
-            }
+            && db_code == DatabaseErrorCode::FOREIGN_KEY_VIOLATION
+        {
+            return AppError::DataNotFound("关联的模板不存在".into());
+        }
         AppError::UnexpectedError(e.into())
     })?;
 
@@ -178,9 +179,9 @@ pub async fn query_archive_records(
                 && (db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
                     || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT)
-                {
-                    return AppError::BuildSchemaQueryFailed;
-                }
+            {
+                return AppError::BuildSchemaQueryFailed;
+            }
             AppError::UnexpectedError(e.into())
         })?;
 
@@ -229,9 +230,9 @@ pub async fn query_archive_records(
                 && (db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
                     || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT)
-                {
-                    return AppError::BuildSchemaQueryFailed;
-                }
+            {
+                return AppError::BuildSchemaQueryFailed;
+            }
             AppError::UnexpectedError(e.into())
         })?;
     if let Some(file_configs) = file_configs {
@@ -430,8 +431,8 @@ pub async fn get_file_metadata(
         }
     }
     let head_object = object_head.unwrap();
-    let file_metadata = FileMetadata::try_from_head(&head_object)
-        .map_err(AppError::UnexpectedError)?;
+    let file_metadata =
+        FileMetadata::try_from_head(&head_object).map_err(AppError::UnexpectedError)?;
 
     Ok(file_metadata)
 }
@@ -602,9 +603,10 @@ fn check_required(file_id: &Option<Uuid>, required: bool, field: &str) -> Result
 fn try_parse_file_id(value: &Option<&serde_json::Value>) -> Option<Uuid> {
     if let Some(v) = value
         && let Some(file_id_str) = v.as_str()
-            && let Ok(file_id) = Uuid::parse_str(file_id_str) {
-                return Some(file_id);
-            }
+        && let Ok(file_id) = Uuid::parse_str(file_id_str)
+    {
+        return Some(file_id);
+    }
     None
 }
 
@@ -625,15 +627,7 @@ async fn process_single_file(
     let file_metadata = get_file_metadata(s3_storage, &source_key).await?;
 
     move_temp_file_to_save(s3_storage, &source_key, &dest_key).await?;
-    save_file_metadata(
-        pool,
-        record_id,
-        file_id,
-        &dest_key,
-        &file_metadata,
-        user_id,
-    )
-    .await?;
+    save_file_metadata(pool, record_id, file_id, &dest_key, &file_metadata, user_id).await?;
 
     Ok(source_key)
 }
@@ -871,9 +865,10 @@ fn replace_uuid_with_url_in_json(val: &mut serde_json::Value, url_map: &HashMap<
     match val {
         serde_json::Value::String(s) => {
             if let Ok(uuid) = Uuid::parse_str(s)
-                && let Some(url) = url_map.get(&uuid) {
-                    *val = serde_json::Value::String(url.clone());
-                }
+                && let Some(url) = url_map.get(&uuid)
+            {
+                *val = serde_json::Value::String(url.clone());
+            }
         }
         serde_json::Value::Array(arr) => {
             for item in arr {

@@ -150,10 +150,7 @@ impl S3Storage {
             Ok(_) => Ok(true),
             Err(e) => match e.into_service_error() {
                 HeadObjectError::NotFound(_) => Ok(false),
-                other => Err(anyhow::anyhow!(
-                    "检查对象是否存在时发生错误: {}",
-                    other
-                )),
+                other => Err(anyhow::anyhow!("检查对象是否存在时发生错误: {}", other)),
             },
         }
     }

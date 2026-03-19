@@ -128,8 +128,7 @@ fn check_token(jwt_config: &JwtConfig, token: &str) -> Result<Claims, AppError> 
 
 #[tracing::instrument(name = "提取令牌", skip(req))]
 fn parse_token(req: &ServiceRequest) -> Result<&str, AppError> {
-    req
-        .headers()
+    req.headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))

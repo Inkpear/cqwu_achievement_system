@@ -275,10 +275,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.api_client
-            .patch(format!(
-                "{}/api/admin/template/modify_status",
-                self.address
-            ))
+            .patch(format!("{}/api/admin/template/modify_status", self.address))
             .json(body)
             .send()
             .await
@@ -364,10 +361,7 @@ impl TestApp {
 
     pub async fn get_archive_template_info(&self, template_id: &str) -> reqwest::Response {
         self.api_client
-            .get(format!(
-                "{}/api/archive/{}/info",
-                self.address, template_id
-            ))
+            .get(format!("{}/api/archive/{}/info", self.address, template_id))
             .send()
             .await
             .expect("Failed to execute request")
@@ -551,7 +545,12 @@ pub fn check_response_code_and_message(response: &serde_json::Value, code: u64, 
     let actual_code = response
         .get("code")
         .and_then(|v| v.as_u64())
-        .unwrap_or_else(|| panic!("response.code is missing or not u64\nresponse = {:#?}", response));
+        .unwrap_or_else(|| {
+            panic!(
+                "response.code is missing or not u64\nresponse = {:#?}",
+                response
+            )
+        });
 
     let actual_message = response
         .get("message")

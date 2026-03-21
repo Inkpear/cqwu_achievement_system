@@ -5,7 +5,7 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use cqwu_achievement_system::{
-    configuration::{DatabaseSettings, get_configuration},
+    configuration::{DatabaseSettings, Settings, get_configuration},
     domain::UserRole,
     telemetry::{get_subscriber, init_subscriber},
     utils::jwt::JwtConfig,
@@ -14,6 +14,7 @@ use rand::{Rng, distr::Alphanumeric};
 use reqwest::header::HeaderMap;
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -38,29 +39,50 @@ pub struct TestApp {
     pub api_client: reqwest::Client,
     pub jwt_config: JwtConfig,
     pub database_config: DatabaseSettings,
+    pub settings: Settings,
+    server_task: JoinHandle<()>,
 }
 
 impl TestApp {
     pub async fn spawn() -> Self {
+        Self::spawn_with_overrides(|_| {}).await
+    }
+
+    pub async fn spawn_with_overrides<F>(override_fn: F) -> Self
+    where
+        F: FnOnce(&mut Settings),
+    {
         LazyLock::force(&TRACING);
 
-        let configuration = {
+        let mut configuration = {
             let mut c = get_configuration().expect("Failed to read configuration.");
             c.database.database_name = Uuid::new_v4().to_string();
             c.application.port = 0;
             c
         };
+        override_fn(&mut configuration);
+
+        Self::spawn_from_settings(configuration, true).await
+    }
+
+    pub async fn spawn_from_settings(configuration: Settings, init_database: bool) -> Self {
+        LazyLock::force(&TRACING);
 
         let api_client = reqwest::Client::new();
-
-        let db_pool = configure_database(&configuration.database).await;
+        let db_pool = if init_database {
+            configure_database(&configuration.database).await
+        } else {
+            PgPool::connect_with(configuration.database.with_db())
+                .await
+                .expect("Failed to connect to Postgres")
+        };
 
         let application =
             cqwu_achievement_system::startup::Application::build(configuration.clone())
                 .await
                 .expect("Failed to build application.");
 
-        let jwt_config = configuration.jwt;
+        let jwt_config = configuration.jwt.clone();
 
         let address = format!(
             "http://{}:{}",
@@ -70,7 +92,11 @@ impl TestApp {
 
         let port = application.port();
 
-        tokio::spawn(application.run_until_stopped());
+        let server_task = tokio::spawn(async move {
+            let _ = application.run_until_stopped().await;
+        });
+
+        let database_config = configuration.database.clone();
 
         TestApp {
             address,
@@ -78,8 +104,14 @@ impl TestApp {
             db_pool,
             api_client,
             jwt_config,
-            database_config: configuration.database,
+            database_config,
+            settings: configuration,
+            server_task,
         }
+    }
+
+    pub async fn shutdown(self) {
+        self.server_task.abort();
     }
 
     pub async fn post_create_user(&self, body: &serde_json::Value) -> reqwest::Response {

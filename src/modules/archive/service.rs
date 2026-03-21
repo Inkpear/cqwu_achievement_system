@@ -20,6 +20,7 @@ use crate::{
             QueryArchiveRecordsRequest, UploadSession,
         },
     },
+    tasks::{dispatcher::TaskDispatcher, models::TaskCommand},
     utils::{
         redis_cache::RedisCache,
         s3_storage::{
@@ -447,11 +448,42 @@ pub async fn move_temp_file_to_save(
         .copy_source_to_dest(source_key, dest_key)
         .await
         .map_err(AppError::UnexpectedError)?;
-    s3_storage
-        .delete_object(source_key)
-        .await
-        .map_err(AppError::UnexpectedError)?;
     Ok(())
+}
+
+pub fn collect_archive_object_keys_from_data(
+    record_id: &Uuid,
+    file_configs: &SchemaFileFieldConfigs,
+    data: &serde_json::Value,
+) -> Result<Vec<String>, AppError> {
+    let mut keys = Vec::new();
+    let mut unique_file_ids = HashSet::new();
+
+    for (field, _config) in file_configs.iter() {
+        let value = data.get(field);
+        match value {
+            Some(serde_json::Value::String(_)) => {
+                if let Some(file_id) = try_parse_file_id(&value)
+                    && unique_file_ids.insert(file_id)
+                {
+                    keys.push(build_archive_dest_key(record_id, &file_id));
+                }
+            }
+            Some(serde_json::Value::Array(arr)) => {
+                for item in arr {
+                    let parsed = try_parse_file_id(&Some(item));
+                    if let Some(file_id) = parsed
+                        && unique_file_ids.insert(file_id)
+                    {
+                        keys.push(build_archive_dest_key(record_id, &file_id));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(keys)
 }
 
 #[tracing::instrument(
@@ -799,16 +831,36 @@ pub async fn delete_archive_record_by_id(
     Ok(object_keys)
 }
 
-#[tracing::instrument(name = "根据对象键在S3中删除文件", skip(s3_storage, object_keys))]
+#[tracing::instrument(
+    name = "根据对象键在S3中删除文件",
+    skip(s3_storage, task_dispatcher, object_keys)
+)]
 pub async fn delete_files_by_object_keys(
     s3_storage: &S3Storage,
+    task_dispatcher: &TaskDispatcher,
     object_keys: &[String],
 ) -> Result<(), AppError> {
-    for object_key in object_keys {
-        s3_storage
-            .delete_object(object_key)
+    if object_keys.is_empty() {
+        return Ok(());
+    }
+
+    if let Err(delete_err) = s3_storage.delete_objects(object_keys).await {
+        tracing::warn!(
+            "delete archive objects failed, enqueueing retry command, error={:?}",
+            delete_err
+        );
+
+        if let Err(dispatch_err) = task_dispatcher
+            .submit(TaskCommand::DeleteArchiveObjects {
+                object_keys: object_keys.to_vec(),
+            })
             .await
-            .map_err(AppError::UnexpectedError)?;
+        {
+            tracing::warn!(
+                "delete archive objects compensation dropped, enqueue failed, error={:?}",
+                dispatch_err
+            );
+        }
     }
 
     Ok(())

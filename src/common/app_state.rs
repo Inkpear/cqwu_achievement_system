@@ -1,7 +1,10 @@
 use sqlx::PgPool;
 
-use crate::utils::{
-    jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache,
+use crate::{
+    tasks::dispatcher::TaskDispatcher,
+    utils::{
+        jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache,
+    },
 };
 
 pub struct AppState {
@@ -10,6 +13,7 @@ pub struct AppState {
     pub schema_cache: SchemaContextCache,
     pub s3_storage: S3Storage,
     pub redis_cache: RedisCache,
+    pub task_dispatcher: TaskDispatcher,
 }
 
 impl AppState {
@@ -19,6 +23,7 @@ impl AppState {
         schema_cache: SchemaContextCache,
         s3_storage: S3Storage,
         redis_cache: RedisCache,
+        task_dispatcher: TaskDispatcher,
     ) -> Self {
         Self {
             pool,
@@ -26,6 +31,7 @@ impl AppState {
             schema_cache,
             s3_storage,
             redis_cache,
+            task_dispatcher,
         }
     }
 }

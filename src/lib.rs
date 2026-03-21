@@ -6,5 +6,6 @@ pub mod domain;
 pub mod middleware;
 pub mod modules;
 pub mod startup;
+pub mod tasks;
 pub mod telemetry;
 pub mod utils;

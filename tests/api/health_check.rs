@@ -6,7 +6,7 @@ async fn health_check_works() {
 
     let response = app
         .api_client
-        .get(&format!("{}/health_check", &app.address))
+        .get(format!("{}/health_check", &app.address))
         .send()
         .await
         .unwrap();

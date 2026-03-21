@@ -89,7 +89,7 @@ impl ResponseError for AppError {
                 let field_errors = parse_validation_errors(errors);
 
                 AppResponse::builder()
-                    .code(status_code.clone())
+                    .code(status_code)
                     .message("参数校验失败")
                     .data(serde_json::json!({ "errors": field_errors }))
                     .build()
@@ -100,7 +100,7 @@ impl ResponseError for AppError {
                     _ => self.to_string(),
                 };
                 AppResponse::builder()
-                    .code(status_code.clone())
+                    .code(status_code)
                     .message(&message)
                     .data(serde_json::json!({}))
                     .build()

@@ -129,7 +129,13 @@ pub async fn update_template_handler(
         ));
     }
 
-    let dto = update_template(&app_state.pool, &user.username, req).await?;
+    let dto = update_template(
+        &app_state.pool,
+        &app_state.schema_cache,
+        &user.username,
+        req,
+    )
+    .await?;
 
     Ok(AppResponse::success_msg(dto, "收集模板更新成功"))
 }
@@ -164,7 +170,12 @@ pub async fn delete_template_handler(
         ));
     }
 
-    delete_template(&app_state.pool, template_id.into_inner()).await?;
+    delete_template(
+        &app_state.pool,
+        &app_state.schema_cache,
+        template_id.into_inner(),
+    )
+    .await?;
 
     Ok(AppResponse::ok_msg("收集模板删除成功"))
 }

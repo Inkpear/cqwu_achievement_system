@@ -10,14 +10,16 @@ use crate::{
         archive::{
             models::{CreateArchiveRecordRequest, PreSignedRequests, QueryArchiveRecordsRequest},
             service::{
-                check_file_validity, check_need_file, check_session_exists_and_delete_it,
-                create_archive_record, create_files_record, delete_archive_record_by_id,
+                check_file_validity, check_need_file, check_upload_session_exists,
+                collect_archive_object_keys_from_data, create_archive_record, create_files_record,
+                delete_archive_record_by_id, delete_files_by_object_keys, delete_upload_session,
                 enrich_archive_records_with_urls, get_or_load_template_context,
                 get_template_info_by_id, init_upload_session, presigned_upload_url,
                 query_archive_records, try_to_get_field_quota, validate_instance_by_id,
             },
         },
     },
+    tasks::models::TaskCommand,
 };
 
 #[cfg(feature = "swagger")]
@@ -78,28 +80,84 @@ pub async fn create_archive_record_handler(
 
     let record = create_archive_record(&mut tx, &req.0, &template_id, &user.sub).await?;
     let has_files = schema_context.file_field_configs.is_some() && req.session_id.is_some();
+    let mut expected_object_keys = Vec::new();
 
     if has_files {
-        check_session_exists_and_delete_it(
-            &app_state.redis_cache,
-            req.session_id.as_ref().unwrap(),
-        )
-        .await?;
-        create_files_record(
-            &app_state.s3_storage,
-            &mut tx,
+        expected_object_keys = collect_archive_object_keys_from_data(
             &record.record_id,
             schema_context.file_field_configs.as_ref().unwrap(),
-            req.session_id.as_ref().unwrap(),
-            &user.sub,
             &req.data,
-        )
-        .await?;
+        )?;
+    }
+
+    let tx_result: Result<(), AppError> = async {
+        if has_files {
+            check_upload_session_exists(&app_state.redis_cache, req.session_id.as_ref().unwrap())
+                .await?;
+            create_files_record(
+                &app_state.s3_storage,
+                &mut tx,
+                &record.record_id,
+                schema_context.file_field_configs.as_ref().unwrap(),
+                req.session_id.as_ref().unwrap(),
+                &user.sub,
+                &req.data,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+    .await;
+
+    if let Err(err) = tx_result {
+        if let Err(rollback_err) = tx.rollback().await {
+            tracing::warn!(
+                "archive create tx rollback failed, record_id={}, error={:?}",
+                record.record_id,
+                rollback_err
+            );
+        }
+
+        if has_files && !expected_object_keys.is_empty() {
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                app_state
+                    .task_dispatcher
+                    .submit(TaskCommand::DeleteArchiveObjects {
+                        object_keys: expected_object_keys,
+                    }),
+            )
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(dispatch_err)) => {
+                    tracing::warn!(
+                        "archive create failed and fallback cleanup enqueue failed, record_id={}, error={:?}",
+                        record.record_id,
+                        dispatch_err
+                    );
+                }
+                Err(timeout_err) => {
+                    tracing::warn!(
+                        "archive create failed and fallback cleanup enqueue timed out, record_id={}, error={:?}",
+                        record.record_id,
+                        timeout_err
+                    );
+                }
+            }
+        }
+
+        return Err(err);
     }
 
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    if let Some(session_id) = req.session_id {
+        delete_upload_session(&app_state.redis_cache, &session_id).await?;
+    }
 
     let record = if has_files {
         let mut record_vec = vec![record];
@@ -304,11 +362,18 @@ pub async fn delete_archive_record_handler(
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
-    delete_archive_record_by_id(&mut tx, &app_state.s3_storage, &template_id, &record_id).await?;
+    let object_keys = delete_archive_record_by_id(&mut tx, &template_id, &record_id).await?;
 
     tx.commit()
         .await
         .map_err(|e| AppError::UnexpectedError(e.into()))?;
+
+    delete_files_by_object_keys(
+        &app_state.s3_storage,
+        &app_state.task_dispatcher,
+        &object_keys,
+    )
+    .await?;
 
     Ok(AppResponse::ok_msg("删除归档记录成功"))
 }

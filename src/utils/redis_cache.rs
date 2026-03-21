@@ -6,6 +6,7 @@ use redis::{FromRedisValue, Script};
 
 use crate::configuration::RedisSettings;
 
+#[derive(Clone)]
 pub struct RedisCache {
     client: Pool,
 }

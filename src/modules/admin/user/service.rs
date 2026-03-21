@@ -34,11 +34,10 @@ pub async fn store_user(pool: &PgPool, user: &RegisterUser) -> Result<UserDTO, A
     .fetch_one(pool)
     .await
     .map_err(|e| {
-        if let Some(db_error) = e.as_database_error() {
-            if Some(DatabaseErrorCode::UNIQUE_VIOLATION).eq(&db_error.code().as_deref()) {
+        if let Some(db_error) = e.as_database_error()
+            && Some(DatabaseErrorCode::UNIQUE_VIOLATION).eq(&db_error.code().as_deref()) {
                 return AppError::UserAlreadyExists;
             }
-        }
         AppError::UnexpectedError(e.into())
     })?;
 

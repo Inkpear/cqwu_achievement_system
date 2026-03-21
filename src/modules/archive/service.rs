@@ -20,6 +20,7 @@ use crate::{
             QueryArchiveRecordsRequest, UploadSession,
         },
     },
+    tasks::{dispatcher::TaskDispatcher, models::TaskCommand},
     utils::{
         redis_cache::RedisCache,
         s3_storage::{
@@ -82,7 +83,7 @@ async fn from_database_get_template_context(
     .await
     .map_err(|e| AppError::UnexpectedError(e.into()))?;
 
-    if let None = row {
+    if row.is_none() {
         return Err(AppError::DataNotFound("关联的模板不存在".into()));
     }
 
@@ -125,10 +126,10 @@ pub async fn create_archive_record(
     .fetch_one(pool.as_mut())
     .await
     .map_err(|e| {
-        if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
-            if db_code == DatabaseErrorCode::FOREIGN_KEY_VIOLATION {
-                return AppError::DataNotFound("关联的模板不存在".into());
-            }
+        if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code())
+            && db_code == DatabaseErrorCode::FOREIGN_KEY_VIOLATION
+        {
+            return AppError::DataNotFound("关联的模板不存在".into());
         }
         AppError::UnexpectedError(e.into())
     })?;
@@ -165,7 +166,7 @@ pub async fn query_archive_records(
     );
 
     query_builder.push("WHERE archive_record.template_id = ");
-    query_builder.push_bind(&template_id);
+    query_builder.push_bind(template_id);
 
     if let Some(filters) = &req.filters {
         build_where_clause(&mut query_builder, filters);
@@ -175,13 +176,12 @@ pub async fn query_archive_records(
         .fetch_one(pool)
         .await
         .map_err(|e| {
-            if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
-                if db_code == DatabaseErrorCode::SYNTAX_ERROR
+            if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code())
+                && (db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
-                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT
-                {
-                    return AppError::BuildSchemaQueryFailed;
-                }
+                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT)
+            {
+                return AppError::BuildSchemaQueryFailed;
             }
             AppError::UnexpectedError(e.into())
         })?;
@@ -198,7 +198,7 @@ pub async fn query_archive_records(
         "#,
     );
     query_builder.push("WHERE archive_record.template_id = ");
-    query_builder.push_bind(&template_id);
+    query_builder.push_bind(template_id);
 
     if let Some(filters) = &req.filters {
         build_where_clause(&mut query_builder, filters);
@@ -227,13 +227,12 @@ pub async fn query_archive_records(
         .fetch_all(pool)
         .await
         .map_err(|e| {
-            if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code()) {
-                if db_code == DatabaseErrorCode::SYNTAX_ERROR
+            if let Some(db_code) = e.as_database_error().and_then(|db_err| db_err.code())
+                && (db_code == DatabaseErrorCode::SYNTAX_ERROR
                     || db_code == DatabaseErrorCode::INVALID_TEXT_REPRESENTATION
-                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT
-                {
-                    return AppError::BuildSchemaQueryFailed;
-                }
+                    || db_code == DatabaseErrorCode::INVALID_DATETIME_FORMAT)
+            {
+                return AppError::BuildSchemaQueryFailed;
             }
             AppError::UnexpectedError(e.into())
         })?;
@@ -269,7 +268,7 @@ pub async fn init_upload_session(
             1800,
         )
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
     tracing::info!("已创建文件上传会话: {}", session_id);
 
     Ok(session_id)
@@ -291,7 +290,7 @@ pub async fn presigned_upload_url(
     let url = s3_storage
         .generate_presigned_url(&object_key, content_type, content_length, filename)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
 
     let presigned_url = PresignedResponse { url, file_id };
 
@@ -417,7 +416,7 @@ pub async fn get_file_metadata(
     s3_storage: &S3Storage,
     object_key: &str,
 ) -> Result<FileMetadata, AppError> {
-    let object_head = s3_storage.get_head_object_output(&object_key).await;
+    let object_head = s3_storage.get_head_object_output(object_key).await;
     if let Err(e) = object_head {
         match e.into_service_error() {
             HeadObjectError::NotFound(_) => {
@@ -433,8 +432,8 @@ pub async fn get_file_metadata(
         }
     }
     let head_object = object_head.unwrap();
-    let file_metadata = FileMetadata::try_from_head(&head_object)
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    let file_metadata =
+        FileMetadata::try_from_head(&head_object).map_err(AppError::UnexpectedError)?;
 
     Ok(file_metadata)
 }
@@ -446,14 +445,45 @@ pub async fn move_temp_file_to_save(
     dest_key: &str,
 ) -> Result<(), AppError> {
     s3_storage
-        .copy_source_to_dest(&source_key, &dest_key)
+        .copy_source_to_dest(source_key, dest_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
-    s3_storage
-        .delete_object(&source_key)
-        .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
     Ok(())
+}
+
+pub fn collect_archive_object_keys_from_data(
+    record_id: &Uuid,
+    file_configs: &SchemaFileFieldConfigs,
+    data: &serde_json::Value,
+) -> Result<Vec<String>, AppError> {
+    let mut keys = Vec::new();
+    let mut unique_file_ids = HashSet::new();
+
+    for (field, _config) in file_configs.iter() {
+        let value = data.get(field);
+        match value {
+            Some(serde_json::Value::String(_)) => {
+                if let Some(file_id) = try_parse_file_id(&value)
+                    && unique_file_ids.insert(file_id)
+                {
+                    keys.push(build_archive_dest_key(record_id, &file_id));
+                }
+            }
+            Some(serde_json::Value::Array(arr)) => {
+                for item in arr {
+                    let parsed = try_parse_file_id(&Some(item));
+                    if let Some(file_id) = parsed
+                        && unique_file_ids.insert(file_id)
+                    {
+                        keys.push(build_archive_dest_key(record_id, &file_id));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(keys)
 }
 
 #[tracing::instrument(
@@ -507,7 +537,7 @@ pub fn check_need_file(
     let need_file = if let Some(file_field_configs) = &schema_context.file_field_configs {
         file_field_configs
             .iter()
-            .filter(|&(_, config)| config.required == true)
+            .filter(|&(_, config)| config.required)
             .count()
             > 0
     } else {
@@ -603,12 +633,11 @@ fn check_required(file_id: &Option<Uuid>, required: bool, field: &str) -> Result
 }
 
 fn try_parse_file_id(value: &Option<&serde_json::Value>) -> Option<Uuid> {
-    if let Some(v) = value {
-        if let Some(file_id_str) = v.as_str() {
-            if let Ok(file_id) = Uuid::parse_str(file_id_str) {
-                return Some(file_id);
-            }
-        }
+    if let Some(v) = value
+        && let Some(file_id_str) = v.as_str()
+        && let Ok(file_id) = Uuid::parse_str(file_id_str)
+    {
+        return Some(file_id);
     }
     None
 }
@@ -628,16 +657,9 @@ async fn process_single_file(
     let source_key = build_temp_object_key(session_id, file_id);
     let dest_key = build_archive_dest_key(record_id, file_id);
     let file_metadata = get_file_metadata(s3_storage, &source_key).await?;
-    save_file_metadata(
-        pool,
-        record_id,
-        &file_id,
-        &dest_key,
-        &file_metadata,
-        user_id,
-    )
-    .await?;
+
     move_temp_file_to_save(s3_storage, &source_key, &dest_key).await?;
+    save_file_metadata(pool, record_id, file_id, &dest_key, &file_metadata, user_id).await?;
 
     Ok(source_key)
 }
@@ -651,7 +673,7 @@ pub async fn generate_view_url(
     let url = s3_storage
         .generate_view_url(filename, object_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
 
     Ok(url)
 }
@@ -732,8 +754,8 @@ pub async fn enrich_archive_records_with_urls(
     Ok(())
 }
 
-#[tracing::instrument(name = "检查上传会话是否存在并移除", skip(redis_cache, session_id))]
-pub async fn check_session_exists_and_delete_it(
+#[tracing::instrument(name = "检查上传会话有效性", skip(redis_cache, session_id))]
+pub async fn check_upload_session_exists(
     redis_cache: &RedisCache,
     session_id: &Uuid,
 ) -> Result<(), AppError> {
@@ -741,24 +763,33 @@ pub async fn check_session_exists_and_delete_it(
     let exists = redis_cache
         .exists(&session_key)
         .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
+        .map_err(AppError::UnexpectedError)?;
     if !exists {
         return Err(AppError::DataNotFound("上传会话不存在或已过期".into()));
     }
-    redis_cache
-        .del(&session_key)
-        .await
-        .map_err(|e| AppError::UnexpectedError(e.into()))?;
     Ok(())
 }
 
-#[tracing::instrument(name = "通过记录ID删除归档记录", skip(pool, s3_storage, record_id))]
+#[tracing::instrument(name = "从redis中删除上传会话", skip(redis_cache, session_id))]
+pub async fn delete_upload_session(
+    redis_cache: &RedisCache,
+    session_id: &Uuid,
+) -> Result<(), AppError> {
+    let session_key = build_upload_session_key(session_id);
+    redis_cache
+        .del(&session_key)
+        .await
+        .map_err(AppError::UnexpectedError)?;
+    tracing::info!("已删除上传会话: {}", session_id);
+    Ok(())
+}
+
+#[tracing::instrument(name = "通过记录ID删除数据库中的归档记录", skip(pool, record_id))]
 pub async fn delete_archive_record_by_id(
     pool: &mut Transaction<'_, Postgres>,
-    s3_storage: &S3Storage,
     template_id: &Uuid,
     record_id: &Uuid,
-) -> Result<(), AppError> {
+) -> Result<Vec<String>, AppError> {
     let object_keys = sqlx::query!(
         r#"
         SELECT object_key
@@ -795,14 +826,43 @@ pub async fn delete_archive_record_by_id(
         .map(|row| row.object_key)
         .collect::<Vec<String>>();
 
-    for object_key in object_keys {
-        s3_storage
-            .delete_object(&object_key)
-            .await
-            .map_err(|e| AppError::UnexpectedError(e.into()))?;
+    tracing::info!("归档记录已从数据库中删除: {}", record_id);
+
+    Ok(object_keys)
+}
+
+#[tracing::instrument(
+    name = "根据对象键在S3中删除文件",
+    skip(s3_storage, task_dispatcher, object_keys)
+)]
+pub async fn delete_files_by_object_keys(
+    s3_storage: &S3Storage,
+    task_dispatcher: &TaskDispatcher,
+    object_keys: &[String],
+) -> Result<(), AppError> {
+    if object_keys.is_empty() {
+        return Ok(());
     }
 
-    tracing::info!("归档记录已删除: {}", record_id);
+    if let Err(delete_err) = s3_storage.delete_objects(object_keys).await {
+        tracing::warn!(
+            "delete archive objects failed, enqueueing retry command, error={:?}",
+            delete_err
+        );
+
+        if let Err(dispatch_err) = task_dispatcher
+            .submit(TaskCommand::DeleteArchiveObjects {
+                object_keys: object_keys.to_vec(),
+            })
+            .await
+        {
+            tracing::warn!(
+                "delete archive objects compensation dropped, enqueue failed, error={:?}",
+                dispatch_err
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -856,10 +916,10 @@ fn collect_uuids_from_json_value(val: &serde_json::Value, collector: &mut HashSe
 fn replace_uuid_with_url_in_json(val: &mut serde_json::Value, url_map: &HashMap<Uuid, String>) {
     match val {
         serde_json::Value::String(s) => {
-            if let Ok(uuid) = Uuid::parse_str(s) {
-                if let Some(url) = url_map.get(&uuid) {
-                    *val = serde_json::Value::String(url.clone());
-                }
+            if let Ok(uuid) = Uuid::parse_str(s)
+                && let Some(url) = url_map.get(&uuid)
+            {
+                *val = serde_json::Value::String(url.clone());
             }
         }
         serde_json::Value::Array(arr) => {

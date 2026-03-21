@@ -11,6 +11,8 @@ pub struct DatabaseSettings {
     pub host: String,
     pub database_name: String,
     pub require_ssl: bool,
+    pub max_connections: Option<u32>,
+    pub min_connections: Option<u32>,
 }
 
 impl DatabaseSettings {
@@ -25,7 +27,7 @@ impl DatabaseSettings {
             .host(&self.host)
             .port(self.port)
             .username(&self.username)
-            .password(&self.password.expose_secret())
+            .password(self.password.expose_secret())
             .ssl_mode(ssl_model)
     }
 
@@ -49,6 +51,75 @@ pub struct Settings {
     pub jwt: JwtConfig,
     pub storage: StorageSettings,
     pub redis: RedisSettings,
+    #[serde(default)]
+    pub tasks: TaskSettings,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct TaskSettings {
+    #[serde(default = "default_orphan_cleanup_interval_seconds")]
+    pub orphan_cleanup_interval_seconds: u64,
+    #[serde(default = "default_orphan_cleanup_min_age_seconds")]
+    pub orphan_cleanup_min_age_seconds: u64,
+    #[serde(default = "default_command_queue_size")]
+    pub command_queue_size: usize,
+    #[serde(default = "default_command_worker_concurrency")]
+    pub command_worker_concurrency: usize,
+    #[serde(default = "default_command_worker_enabled")]
+    pub command_worker_enabled: bool,
+    #[serde(default = "default_outbox_pull_interval_millis")]
+    pub outbox_pull_interval_millis: u64,
+    #[serde(default = "default_outbox_pull_batch_size")]
+    pub outbox_pull_batch_size: usize,
+    #[serde(default = "default_outbox_running_timeout_seconds")]
+    pub outbox_running_timeout_seconds: u64,
+}
+
+fn default_orphan_cleanup_interval_seconds() -> u64 {
+    60 * 60
+}
+
+fn default_orphan_cleanup_min_age_seconds() -> u64 {
+    60 * 60
+}
+
+fn default_command_queue_size() -> usize {
+    1024
+}
+
+fn default_command_worker_concurrency() -> usize {
+    32
+}
+
+fn default_command_worker_enabled() -> bool {
+    true
+}
+
+fn default_outbox_pull_interval_millis() -> u64 {
+    500
+}
+
+fn default_outbox_pull_batch_size() -> usize {
+    100
+}
+
+fn default_outbox_running_timeout_seconds() -> u64 {
+    5 * 60
+}
+
+impl Default for TaskSettings {
+    fn default() -> Self {
+        Self {
+            orphan_cleanup_interval_seconds: default_orphan_cleanup_interval_seconds(),
+            orphan_cleanup_min_age_seconds: default_orphan_cleanup_min_age_seconds(),
+            command_queue_size: default_command_queue_size(),
+            command_worker_concurrency: default_command_worker_concurrency(),
+            command_worker_enabled: default_command_worker_enabled(),
+            outbox_pull_interval_millis: default_outbox_pull_interval_millis(),
+            outbox_pull_batch_size: default_outbox_pull_batch_size(),
+            outbox_running_timeout_seconds: default_outbox_running_timeout_seconds(),
+        }
+    }
 }
 
 enum Environment {

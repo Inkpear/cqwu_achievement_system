@@ -1,23 +1,60 @@
+# Local database overrides.
 database:
+  # Postgres host in local environment.
   host: "192.168.31.199"
+  # Whether TLS is required for DB connections.
   require_ssl: false
 
+# Local HTTP server overrides.
 application:
+  # Bind address in local environment.
   host: "127.0.0.1"
+  # External base URL used in generated links/callbacks.
   base_url: "http://127.0.0.1"
 
+# Local logging overrides.
 log:
+  # Minimum log level.
   log_level: "trace"
 
+# Local JWT overrides.
 jwt:
+  # JWT expiration time in seconds.
   expiration: 86400 # seconds
 
+# Local object storage overrides.
 storage:
+  # S3-compatible endpoint.
   endpoint: "http://10.41.94.104:9000"
+  # Access key for object storage.
   access_key: "root"
+  # Secret key for object storage.
   secret_key: "admin123"
-  sig_exp_seconds: 1800 # 30 minutes 
+  # Expiration of upload pre-signed URLs.
+  sig_exp_seconds: 1800 # 30 minutes
+  # Expiration of view/download pre-signed URLs.
   view_exp_seconds: 86400 # 24 hours
 
+# Local Redis overrides.
 redis:
+  # Redis connection URI.
   uri: "redis://:admin123@192.168.31.199:6379/1"
+
+# Local background task overrides.
+tasks:
+  # Interval for periodic orphan object cleanup.
+  orphan_cleanup_interval_seconds: 3600
+  # Only clean objects older than this age to avoid racing in-flight writes.
+  orphan_cleanup_min_age_seconds: 3600
+  # In-memory queue capacity for task commands.
+  command_queue_size: 1024
+  # Maximum number of concurrent command executions.
+  command_worker_concurrency: 32
+  # Enable/disable command worker and outbox pulling.
+  command_worker_enabled: true
+  # Polling interval for pulling pending commands from outbox.
+  outbox_pull_interval_millis: 500
+  # Maximum outbox rows pulled per poll cycle.
+  outbox_pull_batch_size: 100
+  # Running-task timeout; stale running rows are reclaimed after this period.
+  outbox_running_timeout_seconds: 300

@@ -30,6 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = { version = "10", default-features = false, features = [
     "hmac",
     "sha2",
+    "rust_crypto",
 ] }
 utoipa = { version = "5", features = [
     "actix_extras",
@@ -42,7 +43,7 @@ regex = "1"
 jsonschema = "0.37"
 dashmap = "6"
 aws-config = "1.8"
-aws-sdk-s3 = "1.1"
+aws-sdk-s3 = "1.127.0"
 mime_guess = "2"
 urlencoding = "2.1"
 redis = { version = "0.32", features = ["tokio-comp", "json"] }

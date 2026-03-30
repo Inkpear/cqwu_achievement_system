@@ -15,7 +15,7 @@ application:
 # Production logging overrides.
 log:
   # Minimum log level.
-  log_level: "debug"
+  log_level: "info"
 
 # Production JWT overrides.
 jwt:

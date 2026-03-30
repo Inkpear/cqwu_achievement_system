@@ -30,6 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = { version = "10", default-features = false, features = [
     "hmac",
     "sha2",
+    "rust_crypto",
 ] }
 utoipa = { version = "5", features = [
     "actix_extras",

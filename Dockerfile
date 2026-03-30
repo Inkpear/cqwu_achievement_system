@@ -1,4 +1,4 @@
-FROM rust:1.91-slim-bookworm AS chef
+FROM rust:1.91-slim-bookworm@sha256:8514999d4786ef12efe89239e86b3d0a021b94b9d35108c8efe6c79ca7dc1a65 AS chef
 WORKDIR /app
 RUN apt-get update && apt-get install -y lld clang
 RUN cargo install cargo-chef
@@ -20,15 +20,15 @@ COPY . .
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin cqwu_achievement_system
 
-FROM gcr.io/distroless/cc-debian12 AS runtime
-
-USER 65532:65532
+FROM gcr.io/distroless/cc-debian12@sha256:329e54034ce498f9c6b345044e8f530c6691f99e94a92446f68c0adf9baa8464 AS runtime
 
 WORKDIR /app
 
 COPY --from=builder --chown=65532:65532 /app/target/release/cqwu_achievement_system .
 COPY --from=builder --chown=65532:65532 /app/configuration ./configuration
 COPY --from=builder --chown=65532:65532 /app/migrations ./migrations
+
+USER 65532:65532
 
 ENV APP_ENVIRONMENT=production
 

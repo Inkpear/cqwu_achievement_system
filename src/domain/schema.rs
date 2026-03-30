@@ -12,6 +12,7 @@ static FILE_TYPE_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
 #[derive(Clone, Serialize, Deserialize, Validate)]
 pub struct SchemaFileFieldConfig {
     #[cfg_attr(feature = "swagger", schema(example = r#"[".jpg", ".png", ".pdf"]"#))]
+    #[serde(deserialize_with = "deserialize_allowed_types")]
     #[validate(custom(function = "validate_allowed_types"))]
     pub allowed_types: Vec<String>,
 
@@ -24,6 +25,28 @@ pub struct SchemaFileFieldConfig {
     pub max_size: i64,
 
     pub required: bool,
+}
+
+fn deserialize_allowed_types<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Array(items) => items
+            .into_iter()
+            .map(|v| match v {
+                Value::String(s) => Ok(s),
+                _ => Err(serde::de::Error::custom(
+                    "allowed_types must contain only strings",
+                )),
+            })
+            .collect(),
+        Value::Object(map) if map.is_empty() => Ok(Vec::new()),
+        _ => Err(serde::de::Error::custom(
+            "allowed_types must be an array of strings",
+        )),
+    }
 }
 
 fn validate_allowed_types(types: &Vec<String>) -> Result<(), ValidationError> {

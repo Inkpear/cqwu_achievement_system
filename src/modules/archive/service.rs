@@ -330,6 +330,16 @@ const DEDUCT_QUOTA_LUA_SCRIPT: &str = r#"
     local req_user_id = ARGV[1]
     local field_name = ARGV[2]
 
+    local function ensure_array(value)
+        if type(value) ~= 'table' then
+            return value
+        end
+        if next(value) ~= nil then
+            return value
+        end
+        return cjson.decode('[]')
+    end
+
     local session_data = redis.call('GET', session_key)
     if not session_data then
         return redis.error_reply("SESSION_NOT_FOUND")
@@ -354,6 +364,7 @@ const DEDUCT_QUOTA_LUA_SCRIPT: &str = r#"
     end
 
     field_config.quota = field_config.quota - 1
+    field_config.allowed_types = ensure_array(field_config.allowed_types)
     field_configs[field_name] = field_config
 
     if schema_file_configs.configs then
@@ -362,9 +373,13 @@ const DEDUCT_QUOTA_LUA_SCRIPT: &str = r#"
         session.schema_file_configs = field_configs
     end
 
-    redis.call('SETEX', session_key, 1800, cjson.encode(session))
+    local encoded_session = cjson.encode(session)
+    encoded_session = string.gsub(encoded_session, '"allowed_types":{}', '"allowed_types":[]')
+    redis.call('SETEX', session_key, 1800, encoded_session)
 
-    return cjson.encode(field_config)
+    local encoded_field_config = cjson.encode(field_config)
+    encoded_field_config = string.gsub(encoded_field_config, '"allowed_types":{}', '"allowed_types":[]')
+    return encoded_field_config
 "#;
 
 #[tracing::instrument(

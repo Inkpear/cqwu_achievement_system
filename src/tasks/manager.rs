@@ -71,6 +71,45 @@ impl TaskManager {
         self.handles.push(handle);
     }
 
+    pub fn add_quiet_interval_task<F, Fut>(
+        &mut self,
+        task_name: impl Into<String>,
+        task_fn: F,
+        interval: Duration,
+    ) where
+        F: Fn() -> Fut + Send + 'static,
+        Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
+    {
+        let mut stop_rx = self.stop_tx.subscribe();
+        let task_name = task_name.into();
+
+        let handle = tokio::spawn(async move {
+            let task_fn = task_fn;
+            let mut ticker = time::interval(interval);
+            ticker.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
+            ticker.tick().await;
+
+            loop {
+                tokio::select! {
+                    _ = stop_rx.changed() => {
+                        if *stop_rx.borrow() {
+                            tracing::info!("stopping interval task {}", task_name);
+                            break;
+                        }
+                    }
+
+                    _ = ticker.tick() => {
+                        if let Err(e) = task_fn().await {
+                            tracing::error!("interval task {} failed: {:?}", task_name, e);
+                        }
+                    }
+                }
+            }
+        });
+
+        self.handles.push(handle);
+    }
+
     pub fn add_command_worker<H>(&mut self, handler: H)
     where
         H: HandleTaskCommand + Send + Sync + 'static,

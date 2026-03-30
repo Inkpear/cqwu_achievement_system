@@ -16,8 +16,11 @@ use crate::{
     middleware::auth::mw_authentication,
     modules::{admin, archive, auth, health_check::health_check_handler, user},
     tasks::{
-        dispatcher::TaskDispatcher, handler::DefaultTaskHandler, manager::TaskManager,
-        models::RetryConfig, periodic::s3_cleanup::cleanup_orphan_persistent_objects,
+        dispatcher::TaskDispatcher,
+        handler::DefaultTaskHandler,
+        manager::TaskManager,
+        models::RetryConfig,
+        periodic::{outbox_pull::pull_outbox_tasks, s3_cleanup::cleanup_orphan_persistent_objects},
     },
     utils::{
         jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache,
@@ -264,27 +267,11 @@ impl Application {
             let pull_batch_size = task_settings.outbox_pull_batch_size;
             let running_timeout =
                 std::time::Duration::from_secs(task_settings.outbox_running_timeout_seconds);
-            task_manager.add_interval_task(
+            task_manager.add_quiet_interval_task(
                 "pull_outbox_tasks",
                 move || {
                     let dispatcher = pull_dispatcher.clone();
-                    async move {
-                        let reclaimed = dispatcher
-                            .reclaim_stale_running_outbox(running_timeout)
-                            .await?;
-                        if reclaimed > 0 {
-                            tracing::warn!(
-                                "reclaimed {} stale running task(s) from outbox",
-                                reclaimed
-                            );
-                        }
-
-                        let pulled = dispatcher.pump_outbox_once(pull_batch_size).await?;
-                        if pulled > 0 {
-                            tracing::info!("pulled {} task(s) from outbox", pulled);
-                        }
-                        Ok(())
-                    }
+                    async move { pull_outbox_tasks(&dispatcher, pull_batch_size, running_timeout).await }
                 },
                 std::time::Duration::from_millis(task_settings.outbox_pull_interval_millis),
             );

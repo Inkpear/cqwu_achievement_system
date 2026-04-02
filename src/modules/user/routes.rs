@@ -101,10 +101,18 @@ pub async fn presigned_avatar_url_handler(
     let req = req.into_inner();
     req.validate().map_err(AppError::ValidationError)?;
 
-    let content_type = mime_guess::from_path(&req.filename)
-        .first_or_octet_stream()
-        .essence_str()
-        .to_string();
+    let content_type = req
+        .content_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| {
+            mime_guess::from_path(&req.filename)
+                .first_or_octet_stream()
+                .essence_str()
+                .to_string()
+        });
     let presigned_response = presigned_avatar_url(
         &app_state.s3_storage,
         &req.filename,

@@ -1,3 +1,4 @@
 /target
 /logs
+/offline*/
 .sqlx

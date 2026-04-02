@@ -315,10 +315,18 @@ pub async fn presigned_upload_url_handler(
     .await?;
     check_file_validity(&schema_config, &req.filename, req.content_length)?;
 
-    let content_type = mime_guess::from_path(&req.filename)
-        .first_or_octet_stream()
-        .as_ref()
-        .to_string();
+    let content_type = req
+        .content_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| {
+            mime_guess::from_path(&req.filename)
+                .first_or_octet_stream()
+                .as_ref()
+                .to_string()
+        });
     let presigned_url = presigned_upload_url(
         &app_state.s3_storage,
         &req.session_id,

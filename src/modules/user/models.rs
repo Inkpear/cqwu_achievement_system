@@ -59,6 +59,9 @@ pub struct PresignedAvatarUrlRequest {
     #[validate(range(max = 2097152, message = "图片大小不能超过 2MB"))]
     #[cfg_attr(feature = "swagger", schema(example = 1048576))]
     pub content_length: i64,
+
+    #[cfg_attr(feature = "swagger", schema(example = "image/png"))]
+    pub content_type: Option<String>,
 }
 
 #[cfg_attr(feature = "swagger", derive(ToSchema))]

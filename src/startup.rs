@@ -2,8 +2,10 @@ use std::net::TcpListener;
 use std::sync::Arc;
 
 use actix_web::{App, HttpServer, dev::Server, middleware::from_fn, web};
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
+use uuid::Uuid;
 
 #[cfg(feature = "swagger")]
 use utoipa::OpenApi;
@@ -23,7 +25,8 @@ use crate::{
         periodic::{outbox_pull::pull_outbox_tasks, s3_cleanup::cleanup_orphan_persistent_objects},
     },
     utils::{
-        jwt::JwtConfig, redis_cache::RedisCache, s3_storage::S3Storage, schema::SchemaContextCache,
+        jwt::JwtConfig, password::hash_password, redis_cache::RedisCache, s3_storage::S3Storage,
+        schema::SchemaContextCache,
     },
 };
 
@@ -128,6 +131,9 @@ impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, anyhow::Error> {
         let initialized = Self::initialize_application(configuration).await;
 
+        Self::run_migrations(&initialized.connection_pool).await?;
+        Self::ensure_bootstrap_admin_if_empty(&initialized.connection_pool).await?;
+
         let mut task_runtime = Self::setup_task_runtime(
             &initialized.connection_pool,
             &initialized.s3_storage,
@@ -169,6 +175,58 @@ impl Application {
             redis_cache: RedisCache::from_config(&configuration.redis),
             task_settings,
         }
+    }
+
+    async fn run_migrations(connection_pool: &PgPool) -> Result<(), anyhow::Error> {
+        sqlx::migrate!("./migrations")
+            .run(connection_pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to run database migrations: {e}"))
+    }
+
+    async fn ensure_bootstrap_admin_if_empty(
+        connection_pool: &PgPool,
+    ) -> Result<(), anyhow::Error> {
+        let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*)::BIGINT FROM sys_user")
+            .fetch_one(connection_pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to query sys_user count: {e}"))?;
+
+        if user_count > 0 {
+            return Ok(());
+        }
+
+        let username = format!(
+            "bootstrap_admin_{}",
+            &Uuid::new_v4().simple().to_string()[..8]
+        );
+        let plain_password = format!("Adm!{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        let password_hash = hash_password(SecretString::from(plain_password.clone())).await?;
+
+        let inserted_id: Option<Uuid> = sqlx::query_scalar(
+            r#"
+                INSERT INTO sys_user (username, nickname, password_hash, role, is_active)
+                SELECT $1, $2, $3, 'ADMIN', TRUE
+                WHERE NOT EXISTS (SELECT 1 FROM sys_user)
+                RETURNING user_id
+            "#,
+        )
+        .bind(&username)
+        .bind("系统管理员")
+        .bind(password_hash.expose_secret())
+        .fetch_optional(connection_pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to bootstrap admin user: {e}"))?;
+
+        if inserted_id.is_some() {
+            tracing::warn!(
+                "sys_user is empty, bootstrap admin created. username='{}', password='{}'. Please login and rotate credentials immediately.",
+                username,
+                plain_password
+            );
+        }
+
+        Ok(())
     }
 
     fn sanitize_task_settings(mut task_settings: TaskSettings) -> TaskSettings {

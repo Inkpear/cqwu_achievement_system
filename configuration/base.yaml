@@ -50,7 +50,7 @@ tasks:
   # Enable/disable command worker and outbox pulling.
   command_worker_enabled: true
   # Polling interval for pulling pending commands from outbox.
-  outbox_pull_interval_millis: 500
+  outbox_pull_interval_millis: 5000
   # Maximum outbox rows pulled per poll cycle.
   outbox_pull_batch_size: 100
   # Running-task timeout; stale running rows are reclaimed after this period.

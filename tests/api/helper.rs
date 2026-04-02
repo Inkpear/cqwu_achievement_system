@@ -491,13 +491,33 @@ impl TestUser {
     }
 
     pub async fn default_admin(pool: &PgPool) -> Self {
-        let row = sqlx::query!("SELECT user_id FROM sys_user WHERE username = 'admin'")
-            .fetch_one(pool)
-            .await
-            .expect("Failed to fetch admin ID");
+        let user_id =
+            match sqlx::query_scalar!("SELECT user_id FROM sys_user WHERE username = 'admin'")
+                .fetch_optional(pool)
+                .await
+                .expect("Failed to fetch admin ID")
+            {
+                Some(user_id) => user_id,
+                None => {
+                    let mut user = Self {
+                        user_id: None,
+                        username: "admin".to_string(),
+                        nickname: "系统管理员".to_string(),
+                        password: "admin123".to_string(),
+                        role: UserRole::ADMIN,
+                    };
+
+                    user.store(pool).await;
+
+                    sqlx::query_scalar!("SELECT user_id FROM sys_user WHERE username = 'admin'")
+                        .fetch_one(pool)
+                        .await
+                        .expect("Failed to fetch created admin ID")
+                }
+            };
 
         Self {
-            user_id: Some(row.user_id),
+            user_id: Some(user_id),
             username: "admin".to_string(),
             nickname: "系统管理员".to_string(),
             password: "admin123".to_string(),
@@ -522,11 +542,12 @@ impl TestUser {
             .unwrap()
             .to_string();
         sqlx::query!(
-            "INSERT INTO sys_user (username, nickname, password_hash)
-            VALUES ($1, $2, $3)",
+            "INSERT INTO sys_user (username, nickname, password_hash, role, is_active)
+            VALUES ($1, $2, $3, $4, TRUE)",
             self.username,
             self.nickname,
-            password_hash
+            password_hash,
+            self.role.as_str(),
         )
         .execute(pool)
         .await

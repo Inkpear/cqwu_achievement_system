@@ -41,6 +41,8 @@ Edit `scripts/docker/.env` and at minimum change:
 - `POSTGRES_PASSWORD`
 - `REDIS_PASSWORD`
 - `MINIO_ROOT_PASSWORD`
+- `NGINX_SERVER_NAME` (set to ops-assigned frontend domain)
+- `APP_APPLICATION_BASE_URL` (set to public backend domain)
 - `APP_STORAGE_ENDPOINT` (must be reachable by browser/client)
 
 Important:

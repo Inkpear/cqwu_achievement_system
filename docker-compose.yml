@@ -115,6 +115,7 @@ services:
       dockerfile: Dockerfile
     environment:
       TZ: ${TZ:-CST-8}
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
     volumes:
       - /etc/localtime:/etc/localtime:ro
     ports:
